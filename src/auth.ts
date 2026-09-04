@@ -3,14 +3,15 @@ import Credentials from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  // Required for production deployments on Vercel / any HTTPS host.
-  // NextAuth v5 beta does not auto-detect the host in edge/serverless environments.
+  // Required for NextAuth v5 on Vercel / any non-localhost host.
+  // Without this the host-header check silently fails and authorize() returns null.
   trustHost: true,
+
   providers: [
     Credentials({
       name: 'credentials',
       credentials: {
-        email: { label: 'Email', type: 'email' },
+        email:    { label: 'Email',    type: 'email'    },
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
@@ -20,7 +21,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const adminHash  = process.env.ADMIN_PASSWORD_HASH;
 
         if (!adminEmail || !adminHash) {
-          console.error('[auth] Admin credentials env vars are not configured');
+          console.error('[auth] ADMIN_EMAIL or ADMIN_PASSWORD_HASH env vars are missing');
           return null;
         }
 
@@ -34,9 +35,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!passwordMatch) return null;
 
         return {
-          id: 'admin',
+          id:    'admin',
           email: adminEmail,
-          name: 'Admin',
+          name:  'Admin',
         };
       },
     }),
@@ -47,12 +48,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   pages: {
     signIn: '/login',
-    error: '/login',
+    error:  '/login',
   },
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id;
+        token.id    = user.id;
         token.email = user.email;
       }
       return token;
