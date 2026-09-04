@@ -161,10 +161,10 @@ export default function ScanPage() {
         <div className="scan-card-header">
           <span className="scan-card-icon">🤖</span>
           <div>
-            <div className="scan-card-title">Gemini Vision AI</div>
-            <div className="scan-card-sub">Powered by Google Gemini 2.0 Flash via OpenRouter</div>
+            <div className="scan-card-title">Llama 3.2 Vision AI</div>
+            <div className="scan-card-sub">Powered by Meta Llama 3.2 11B Vision via OpenRouter (free)</div>
           </div>
-          <div className="scan-model-badge">gemini-2.0-flash</div>
+          <div className="scan-model-badge">llama-3.2-vision:free</div>
         </div>
 
         {/* Drop zone */}

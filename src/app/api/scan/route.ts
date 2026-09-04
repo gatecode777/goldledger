@@ -85,7 +85,7 @@ export async function POST(req: Request) {
         'X-Title': 'GoldLedger AI Scan',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.0-flash-001',
+        model: 'meta-llama/llama-3.2-11b-vision-instruct:free',
         messages: [
           {
             role: 'system',
