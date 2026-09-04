@@ -3,6 +3,9 @@ import Credentials from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  // Required for production deployments on Vercel / any HTTPS host.
+  // NextAuth v5 beta does not auto-detect the host in edge/serverless environments.
+  trustHost: true,
   providers: [
     Credentials({
       name: 'credentials',
