@@ -89,8 +89,8 @@ export async function POST(req: Request) {
           },
         ],
         generationConfig: {
-          temperature: 0,      // deterministic — we want consistent extraction
-          maxOutputTokens: 512,
+          temperature: 0,
+          maxOutputTokens: 2048,   // increased — 512 caused JSON truncation
         },
       }),
     });
@@ -116,11 +116,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Failed to reach AI service. Check network.' }, { status: 502 });
   }
 
-  // Strip markdown fences if the model added them despite instructions
-  const cleaned = rawText
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```$/i, '')
-    .trim();
+  // Robustly extract the JSON object from the response.
+  // The model is instructed to return only JSON, but defensively handle
+  // markdown fences or surrounding prose by finding the first { ... } block.
+  function extractJson(text: string): string {
+    // 1. Strip markdown fences
+    let s = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    // 2. Find first { and last } — handles any surrounding text
+    const start = s.indexOf('{');
+    const end   = s.lastIndexOf('}');
+    if (start !== -1 && end !== -1 && end > start) {
+      s = s.slice(start, end + 1);
+    }
+    return s;
+  }
+
+  const cleaned = extractJson(rawText);
 
   let extracted: Record<string, unknown>;
   try {
