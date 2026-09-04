@@ -161,10 +161,10 @@ export default function ScanPage() {
         <div className="scan-card-header">
           <span className="scan-card-icon">🤖</span>
           <div>
-            <div className="scan-card-title">Gemini 1.5 Flash Vision</div>
+            <div className="scan-card-title">Gemini 2.0 Flash Vision</div>
             <div className="scan-card-sub">Powered by Google AI Studio — free, 1500 req/day</div>
           </div>
-          <div className="scan-model-badge">gemini-1.5-flash</div>
+          <div className="scan-model-badge">gemini-2.0-flash-exp</div>
         </div>
 
         {/* Drop zone */}

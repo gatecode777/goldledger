@@ -66,8 +66,8 @@ export async function POST(req: Request) {
   const arrayBuffer = await file.arrayBuffer();
   const base64Data = Buffer.from(arrayBuffer).toString('base64');
 
-  // Call Google Generative Language API — Gemini 1.5 Flash
-  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+  // Call Google Generative Language API — Gemini 2.0 Flash Experimental
+  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`;
 
   let rawText: string;
   try {
