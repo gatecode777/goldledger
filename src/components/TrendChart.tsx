@@ -16,7 +16,9 @@ interface DayPoint {
   netFlow: number;
 }
 
-export default function TrendChart({ transactions }: TrendChartProps) {
+// React.memo: only re-renders when the transactions array reference changes,
+// not on every dashboard state update (e.g. filter changes, pagination, etc.)
+const TrendChart = React.memo(function TrendChart({ transactions }: TrendChartProps) {
   const points = useMemo<DayPoint[]>(() => {
     if (transactions.length === 0) return [];
 
@@ -190,4 +192,6 @@ export default function TrendChart({ transactions }: TrendChartProps) {
       </svg>
     </div>
   );
-}
+});
+
+export default TrendChart;

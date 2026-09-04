@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Transaction, TransactionType, Purity, WeightUnit, TransactionSource } from '@/lib/types';
 import { CURRENCIES } from '@/lib/currencies';
@@ -105,6 +105,11 @@ export default function TransactionForm({
   }, [voucherMode]);
 
   // ── Keyboard shortcuts (B / S / Ctrl+Enter / Escape) ───────────────────────
+  // Use a ref for successPayload so the keyboard handler never needs to
+  // be re-registered when it changes — avoids unnecessary listener churn.
+  const successPayloadRef = useRef(successPayload);
+  useEffect(() => { successPayloadRef.current = successPayload; }, [successPayload]);
+
   const handleKeyboard = useCallback((e: KeyboardEvent) => {
     const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
     const isInput = tag === 'input' || tag === 'select' || tag === 'textarea';
@@ -115,7 +120,7 @@ export default function TransactionForm({
       return;
     }
 
-    if (e.key === 'Escape' && !successPayload) {
+    if (e.key === 'Escape' && !successPayloadRef.current) {
       if (onCancel) onCancel();
       else router.push('/transactions');
       return;
@@ -126,7 +131,7 @@ export default function TransactionForm({
       if (e.key === 'b' || e.key === 'B') { setType('buy');  e.preventDefault(); }
       if (e.key === 's' || e.key === 'S') { setType('sell'); e.preventDefault(); }
     }
-  }, [onCancel, router, successPayload]);
+  }, [onCancel, router]);
 
   useEffect(() => {
     if (!voucherMode) return;
@@ -134,24 +139,31 @@ export default function TransactionForm({
     return () => window.removeEventListener('keydown', handleKeyboard);
   }, [voucherMode, handleKeyboard]);
 
-  // ── Computed values ──────────────────────────────────────────────────────────
-  const isLowConf = (field: string) => lowConfidenceFields.includes(field);
+  // ── Computed values (memoized — only recomputed when specific inputs change) ──
+  const isLowConf = useCallback((field: string) => lowConfidenceFields.includes(field), [lowConfidenceFields]);
 
-  const totalValue = (() => {
+  const totalValue = useMemo(() => {
     const p = parseFloat(goldPrice);
     const w = parseFloat(weight);
     if (isNaN(p) || isNaN(w) || p <= 0 || w <= 0) return null;
     return p * w;
-  })();
+  }, [goldPrice, weight]);
 
-  const weightGrams = (() => {
+  const weightGrams = useMemo(() => {
     const w = parseFloat(weight);
     if (isNaN(w)) return null;
     return weightToGrams(w, weightUnit);
-  })();
+  }, [weight, weightUnit]);
 
-  const currencyInfo = CURRENCIES.find((c) => c.code === currency);
-  const unitShort = WEIGHT_UNITS.find(u => u.value === weightUnit)?.short ?? weightUnit;
+  const currencyInfo = useMemo(
+    () => CURRENCIES.find((c) => c.code === currency),
+    [currency]
+  );
+
+  const unitShort = useMemo(
+    () => WEIGHT_UNITS.find(u => u.value === weightUnit)?.short ?? weightUnit,
+    [weightUnit]
+  );
 
   // ── Validation ───────────────────────────────────────────────────────────────
   function validate(): boolean {

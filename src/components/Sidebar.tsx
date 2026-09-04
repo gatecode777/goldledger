@@ -1,5 +1,6 @@
 'use client';
 
+import React, { useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
@@ -11,9 +12,17 @@ const navItems = [
   { href: '/settings',     icon: '⚙️',  label: 'Gold Rate Settings' },
 ];
 
-export default function Sidebar() {
+// React.memo — prevents re-render when parent re-renders but pathname/data unchanged
+const Sidebar = React.memo(function Sidebar() {
   const pathname = usePathname();
   const { transactions, rateSettings } = useTransactions();
+
+  // Only recompute when the array length changes, not on every array reference change
+  const txCount = useMemo(() => transactions.length, [transactions]);
+  const referenceRate = useMemo(
+    () => (rateSettings?.referenceRateUSD ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 }),
+    [rateSettings?.referenceRateUSD]
+  );
 
   return (
     <aside className="sidebar">
@@ -45,7 +54,7 @@ export default function Sidebar() {
               <span className="nav-icon">{item.icon}</span>
               <span>{item.label}</span>
               {item.href === '/transactions' && (
-                <span className="nav-badge">{transactions.length}</span>
+                <span className="nav-badge">{txCount}</span>
               )}
             </Link>
           );
@@ -62,11 +71,7 @@ export default function Sidebar() {
       <div className="sidebar-footer">
         <div className="sidebar-rate-display">
           <div className="sidebar-rate-label">Reference Rate</div>
-          <div className="sidebar-rate-value">
-            ${(rateSettings?.referenceRateUSD ?? 0).toLocaleString('en-US', {
-              minimumFractionDigits: 2,
-            })}
-          </div>
+          <div className="sidebar-rate-value">${referenceRate}</div>
           <div className="sidebar-rate-sub">USD / troy oz</div>
         </div>
 
@@ -80,4 +85,6 @@ export default function Sidebar() {
       </div>
     </aside>
   );
-}
+});
+
+export default Sidebar;

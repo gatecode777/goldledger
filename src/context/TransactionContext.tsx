@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { Transaction, GoldRateSettings } from '@/lib/types';
 
 interface TransactionContextValue {
@@ -94,20 +94,25 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
     setRateSettings(updated);
   }, []);
 
+  // Memoize the context value — prevents all consumers from re-rendering when
+  // only an unrelated piece of internal state inside the Provider changes.
+  const value = useMemo<TransactionContextValue>(() => ({
+    transactions,
+    rateSettings,
+    loading,
+    error,
+    addTransaction,
+    updateTransaction,
+    deleteTransaction,
+    updateRateSettings,
+    refetch: fetchAll,
+  }), [
+    transactions, rateSettings, loading, error,
+    addTransaction, updateTransaction, deleteTransaction, updateRateSettings, fetchAll,
+  ]);
+
   return (
-    <TransactionContext.Provider
-      value={{
-        transactions,
-        rateSettings,
-        loading,
-        error,
-        addTransaction,
-        updateTransaction,
-        deleteTransaction,
-        updateRateSettings,
-        refetch: fetchAll,
-      }}
-    >
+    <TransactionContext.Provider value={value}>
       {children}
     </TransactionContext.Provider>
   );
