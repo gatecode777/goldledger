@@ -1,14 +1,11 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 
-// Supported image MIME types
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'];
 const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 
-// The structured extraction prompt sent to the vision model
-const SYSTEM_PROMPT = `You are an expert gold-trade document parser.
-The user uploads a photo of a gold transaction bill, receipt, invoice, or voucher.
-Extract every relevant field and return ONLY a single valid JSON object — no markdown, no prose.
+const EXTRACTION_PROMPT = `You are an expert gold-trade document parser.
+Extract every relevant field from this gold transaction bill/receipt/invoice and return ONLY a single valid JSON object — no markdown fences, no prose, just raw JSON.
 
 Return this exact structure:
 {
@@ -27,23 +24,22 @@ Return this exact structure:
 }
 
 Rules:
-- For purity: 999/999.9 → 24K, 916 → 22K, 875 → 21K, 750 → 18K, 583 → 14K
-- For weightUnit: tola is common in South Asian/Middle East receipts; gram is most common globally
-- If the bill is clearly a purchase receipt → type: "buy"; if it's a sale → type: "sell"; if unclear → "buy" with "type" in lowConfidenceFields
-- If you cannot read a field clearly, set it to null AND add the field name to lowConfidenceFields
-- Never invent values — only extract what is visible in the image
+- Purity: 999/999.9 → 24K, 916 → 22K, 875 → 21K, 750 → 18K, 583 → 14K
+- WeightUnit: tola is common in South Asian/Middle East receipts
+- Purchase receipt → type "buy"; sale → type "sell"; if unclear → "buy" + add "type" to lowConfidenceFields
+- If you cannot clearly read a field → set null AND add field name to lowConfidenceFields
+- Never invent values — only extract what is visible
 - Return ONLY the JSON object, nothing else`;
 
 export async function POST(req: Request) {
-  // Auth gate — API key must never be used from the browser
   const session = await auth();
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = process.env.GOOGLE_AI_KEY;
   if (!apiKey) {
-    console.error('[scan] OPENROUTER_API_KEY is not set');
+    console.error('[scan] GOOGLE_AI_KEY is not set');
     return NextResponse.json({ error: 'AI scan is not configured on this server' }, { status: 503 });
   }
 
@@ -59,75 +55,68 @@ export async function POST(req: Request) {
   if (!file || typeof file === 'string') {
     return NextResponse.json({ error: 'No image file provided' }, { status: 400 });
   }
-
   if (!ALLOWED_TYPES.includes(file.type)) {
     return NextResponse.json({ error: `Unsupported file type: ${file.type}` }, { status: 400 });
   }
-
   if (file.size > MAX_BYTES) {
     return NextResponse.json({ error: 'File too large (max 10 MB)' }, { status: 400 });
   }
 
-  // Convert to base64 data URL for the OpenRouter vision API
+  // Convert image to base64 for Gemini inline data
   const arrayBuffer = await file.arrayBuffer();
-  const base64 = Buffer.from(arrayBuffer).toString('base64');
-  const dataUrl = `data:${file.type};base64,${base64}`;
+  const base64Data = Buffer.from(arrayBuffer).toString('base64');
 
-  // Call OpenRouter vision API
+  // Call Google Generative Language API (Gemini 1.5 Flash)
+  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
   let rawText: string;
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const response = await fetch(geminiUrl, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://goldledger.vercel.app',
-        'X-Title': 'GoldLedger AI Scan',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'meta-llama/llama-3.2-11b-vision-instruct:free',
-        messages: [
+        contents: [
           {
-            role: 'system',
-            content: SYSTEM_PROMPT,
-          },
-          {
-            role: 'user',
-            content: [
+            parts: [
+              { text: EXTRACTION_PROMPT },
               {
-                type: 'image_url',
-                image_url: { url: dataUrl },
-              },
-              {
-                type: 'text',
-                text: 'Extract the gold transaction details from this receipt/bill. Return only the JSON object.',
+                inlineData: {
+                  mimeType: file.type,
+                  data: base64Data,
+                },
               },
             ],
           },
         ],
-        temperature: 0,          // deterministic for data extraction
-        max_tokens: 512,
+        generationConfig: {
+          temperature: 0,      // deterministic — we want consistent extraction
+          maxOutputTokens: 512,
+        },
       }),
     });
 
     if (!response.ok) {
-      const errText = await response.text();
-      console.error('[scan] OpenRouter error:', response.status, errText);
+      const errBody = await response.text();
+      console.error('[scan] Gemini API error:', response.status, errBody);
       return NextResponse.json(
-        { error: `AI service error (${response.status}). Please try again.` },
+        { error: `AI service error (${response.status}). Check your GOOGLE_AI_KEY and try again.` },
         { status: 502 }
       );
     }
 
     const data = await response.json();
-    rawText = data.choices?.[0]?.message?.content ?? '';
+    rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+
+    if (!rawText) {
+      console.error('[scan] Empty response from Gemini:', JSON.stringify(data));
+      return NextResponse.json({ error: 'AI returned an empty response. Try a clearer image.' }, { status: 422 });
+    }
   } catch (err) {
-    console.error('[scan] Fetch to OpenRouter failed:', err);
+    console.error('[scan] Fetch to Gemini failed:', err);
     return NextResponse.json({ error: 'Failed to reach AI service. Check network.' }, { status: 502 });
   }
 
-  // Parse the JSON from the model response
-  // The model is instructed to return only JSON, but defensively strip markdown fences
+  // Strip markdown fences if the model added them despite instructions
   const cleaned = rawText
     .replace(/^```(?:json)?\s*/i, '')
     .replace(/\s*```$/i, '')
@@ -137,7 +126,7 @@ export async function POST(req: Request) {
   try {
     extracted = JSON.parse(cleaned);
   } catch {
-    console.error('[scan] Failed to parse model response:', rawText);
+    console.error('[scan] Failed to parse Gemini response:', rawText);
     return NextResponse.json(
       { error: 'AI returned an unreadable response. Try a clearer image.' },
       { status: 422 }
