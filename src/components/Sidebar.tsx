@@ -9,6 +9,7 @@ import { useTransactions } from '@/context/TransactionContext';
 const navItems = [
   { href: '/',             icon: '📊', label: 'Dashboard' },
   { href: '/transactions', icon: '📋', label: 'Transaction Log' },
+  { href: '/scan',         icon: '🤖', label: 'AI Scan' },
   { href: '/settings',     icon: '⚙️',  label: 'Gold Rate Settings' },
 ];
 
