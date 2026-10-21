@@ -7,11 +7,13 @@ import { useToast } from '@/components/Toast';
 import { formatCurrency, formatDate, purityLabel } from '@/lib/formatters';
 import { Transaction } from '@/lib/types';
 import TransactionForm from '@/components/TransactionForm';
+import { exportTransactionsToExcel } from '@/lib/excel';
+import ExcelImportModal from '@/components/ExcelImportModal';
 
 type SortKey = 'dateTime' | 'type' | 'totalValue' | 'purity' | 'currency';
 
 export default function TransactionsPage() {
-  const { transactions, deleteTransaction, loading, error } = useTransactions();
+  const { transactions, deleteTransaction, loading, error, refetch, rateSettings } = useTransactions();
   const { showToast } = useToast();
 
   // Filters
@@ -31,6 +33,22 @@ export default function TransactionsPage() {
   const [editTx, setEditTx]       = useState<Transaction | null>(null);
   // Delete confirm
   const [deleteId, setDeleteId]   = useState<string | null>(null);
+  // Excel import modal
+  const [isImportOpen, setIsImportOpen] = useState(false);
+
+  function handleExportExcel(exportAll = false) {
+    const listToExport = exportAll || !hasFilters ? transactions : filtered;
+    if (listToExport.length === 0) {
+      showToast('No transactions to export', 'error');
+      return;
+    }
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const filename = (exportAll || !hasFilters)
+      ? `gold_transactions_all_${dateStr}.xlsx`
+      : `gold_transactions_filtered_${dateStr}.xlsx`;
+    exportTransactionsToExcel(listToExport, filename);
+    showToast(`Exported ${listToExport.length} transactions to Excel!`, 'success');
+  }
 
   function handleSort(key: SortKey) {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -125,9 +143,35 @@ export default function TransactionsPage() {
             {filtered.length} of {transactions.length} transactions
           </p>
         </div>
-        <Link href="/transactions/new" className="btn btn-primary">
-          ➕ New Transaction
-        </Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn-excel-export"
+            onClick={() => handleExportExcel(false)}
+            title={hasFilters ? `Export ${filtered.length} filtered transactions to Excel` : `Export all ${transactions.length} transactions to Excel`}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Export Excel {hasFilters ? `(${filtered.length})` : ''}
+          </button>
+
+          <button
+            type="button"
+            className="btn-excel-import"
+            onClick={() => setIsImportOpen(true)}
+            title="Import transactions from an Excel file (.xlsx, .xls)"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            Import Excel
+          </button>
+
+          <Link href="/transactions/new" className="btn btn-primary">
+            ➕ New Transaction
+          </Link>
+        </div>
       </div>
 
       {/* ── Filter Panel ── */}
@@ -192,6 +236,7 @@ export default function TransactionsPage() {
               <option value="all">All</option>
               <option value="manual">Manual</option>
               <option value="scan">AI Scan</option>
+              <option value="import">Excel Import</option>
             </select>
           </div>
 
@@ -283,7 +328,7 @@ export default function TransactionsPage() {
                   </td>
                   <td>
                     <span className={`source-badge ${tx.source}`}>
-                      {tx.source === 'scan' ? '🤖' : '✍️'} {tx.source}
+                      {tx.source === 'scan' ? '🤖' : tx.source === 'import' ? '📊' : '✍️'} {tx.source === 'import' ? 'excel' : tx.source}
                     </span>
                   </td>
                   <td>
@@ -355,6 +400,13 @@ export default function TransactionsPage() {
           </div>
         </div>
       )}
+      {/* Excel Import Modal */}
+      <ExcelImportModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onImportSuccess={() => refetch()}
+        referenceRateUSD={rateSettings?.referenceRateUSD}
+      />
     </>
   );
 }

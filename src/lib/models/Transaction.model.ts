@@ -27,7 +27,6 @@ const TransactionSchema = new Schema(
     notes: { type: String, default: '' },
     source: {
       type: String,
-      enum: ['manual', 'scan'],
       default: 'manual',
     },
     totalValue: { type: Number, required: true },
@@ -39,7 +38,10 @@ const TransactionSchema = new Schema(
   }
 );
 
-// Prevent model re-compilation in dev hot-reloads
+// Prevent model re-compilation issues while allowing schema updates in dev
+if (process.env.NODE_ENV !== 'production' && models.Transaction) {
+  delete (models as any).Transaction;
+}
 const TransactionModel =
   (models.Transaction as mongoose.Model<mongoose.Document>) ||
   model('Transaction', TransactionSchema);

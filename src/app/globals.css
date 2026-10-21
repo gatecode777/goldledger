@@ -2359,3 +2359,80 @@ body {
 }
 .scan-tip-icon { font-size: 14px; flex-shrink: 0; }
 
+/* ══════════════════════════════════════════════════════════════════════════════
+   ─── Excel Import & Export Styles ──────────────────────────────────────────
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.excel-dropzone {
+  border: 2px dashed var(--border-md);
+  border-radius: var(--radius-lg);
+  padding: 44px 20px;
+  text-align: center;
+  background: var(--bg-muted);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.excel-dropzone:hover,
+.excel-dropzone.drag-active {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.05);
+}
+
+.excel-dropzone.drag-active {
+  transform: scale(1.01);
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15);
+}
+
+.btn-excel-export {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all var(--transition);
+}
+
+.btn-excel-export:hover {
+  background: #dcfce7;
+  border-color: #86efac;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(22, 163, 74, 0.15);
+}
+
+.btn-excel-import {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: #f8fafc;
+  color: #334155;
+  border: 1px solid var(--border-md);
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all var(--transition);
+}
+
+.btn-excel-import:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.06);
+}
+
+.source-badge.import {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+

@@ -1,7 +1,7 @@
 export type TransactionType = 'buy' | 'sell';
 export type Purity = '24K' | '22K' | '21K' | '18K' | '14K' | 'custom';
 export type WeightUnit = 'gram' | 'troy_oz' | 'tola';
-export type TransactionSource = 'manual' | 'scan';
+export type TransactionSource = 'manual' | 'scan' | 'import';
 
 export interface Transaction {
   id: string;

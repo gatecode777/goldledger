@@ -330,24 +330,6 @@ export default function TransactionForm({
       <form ref={formRef} onSubmit={handleSubmit} noValidate>
         <div className={`voucher-panel mode-${type}`}>
 
-          {/* ── Keyboard shortcut bar ── */}
-          <div className="kbd-bar">
-            <div className="kbd-bar-item">
-              <span className="kbd-bar-key">B</span> Buy
-            </div>
-            <div className="kbd-bar-item">
-              <span className="kbd-bar-key">S</span> Sell
-            </div>
-            <div className="kbd-bar-item">
-              <span className="kbd-bar-key">Ctrl</span>+<span className="kbd-bar-key">↵</span> Save
-            </div>
-            <div className="kbd-bar-item">
-              <span className="kbd-bar-key">Tab</span> Next field
-            </div>
-            <div className="kbd-bar-item">
-              <span className="kbd-bar-key">Esc</span> Cancel
-            </div>
-          </div>
 
           {/* ── Header: Buy/Sell toggle + Date ── */}
           <div className={`voucher-header mode-${type}`}>

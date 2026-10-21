@@ -3,6 +3,9 @@ import { auth } from '@/auth';
 import { connectDB } from '@/lib/mongodb';
 import TransactionModel from '@/lib/models/Transaction.model';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 // GET /api/transactions — fetch all transactions
 export async function GET() {
   const session = await auth();

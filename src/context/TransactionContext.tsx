@@ -12,6 +12,7 @@ interface TransactionContextValue {
   updateTransaction: (id: string, tx: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
   updateRateSettings: (settings: GoldRateSettings) => Promise<void>;
+  importTransactions: (txs: Omit<Transaction, 'id'>[]) => Promise<number>;
   refetch: () => Promise<void>;
 }
 
@@ -27,9 +28,10 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
     setLoading(true);
     setError(null);
     try {
+      const ts = Date.now();
       const [txRes, rateRes] = await Promise.all([
-        fetch('/api/transactions'),
-        fetch('/api/rate-settings'),
+        fetch(`/api/transactions?t=${ts}`, { cache: 'no-store' }),
+        fetch(`/api/rate-settings?t=${ts}`, { cache: 'no-store' }),
       ]);
 
       if (!txRes.ok) throw new Error('Failed to load transactions');
@@ -94,6 +96,24 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
     setRateSettings(updated);
   }, []);
 
+  const importTransactions = useCallback(async (txs: Omit<Transaction, 'id'>[]) => {
+    const res = await fetch('/api/transactions/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transactions: txs }),
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Failed to import transactions');
+    }
+    const data = await res.json();
+    if (data.transactions && Array.isArray(data.transactions) && data.transactions.length > 0) {
+      setTransactions((prev) => [...data.transactions, ...prev]);
+    }
+    await fetchAll();
+    return (data.count as number) || txs.length;
+  }, [fetchAll]);
+
   // Memoize the context value — prevents all consumers from re-rendering when
   // only an unrelated piece of internal state inside the Provider changes.
   const value = useMemo<TransactionContextValue>(() => ({
@@ -105,10 +125,11 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
     updateTransaction,
     deleteTransaction,
     updateRateSettings,
+    importTransactions,
     refetch: fetchAll,
   }), [
     transactions, rateSettings, loading, error,
-    addTransaction, updateTransaction, deleteTransaction, updateRateSettings, fetchAll,
+    addTransaction, updateTransaction, deleteTransaction, updateRateSettings, importTransactions, fetchAll,
   ]);
 
   return (
