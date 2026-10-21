@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useTransactions } from '@/context/TransactionContext';
 import { useToast } from '@/components/Toast';
@@ -24,6 +24,16 @@ export default function TransactionsPage() {
   const [srcFilter,   setSrcFilter]  = useState('all');
   const [dateFrom,    setDateFrom]   = useState('');
   const [dateTo,      setDateTo]     = useState('');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const src = params.get('source');
+      if (src && ['manual', 'scan', 'import'].includes(src)) {
+        setSrcFilter(src);
+      }
+    }
+  }, []);
 
   // Sort
   const [sortKey, setSortKey]   = useState<SortKey>('dateTime');

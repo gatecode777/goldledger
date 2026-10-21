@@ -34,14 +34,17 @@ export default function DashboardPage() {
     }, {});
 
     const scanCount   = transactions.filter((t) => t.source === 'scan').length;
-    const manualCount = transactions.filter((t) => t.source === 'manual').length;
+    const importCount = transactions.filter((t) => t.source === 'import').length;
+    const manualCount = transactions.filter(
+      (t) => t.source === 'manual' || (!t.source || (t.source !== 'scan' && t.source !== 'import'))
+    ).length;
 
     return {
       totalBuyUSD, totalSellUSD, netUSD,
       totalWeightGrams,
       buyCount: buys.length, sellCount: sells.length,
       latestFiveTransactions, purityBreakdown,
-      scanCount, manualCount,
+      scanCount, manualCount, importCount,
     };
   }, [transactions]);
 
@@ -185,19 +188,73 @@ export default function DashboardPage() {
 
           {/* Source breakdown */}
           <div className="card">
-            <div className="card-header">
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span className="card-title">🔍 By Source</span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>
+                {transactions.length} total
+              </span>
             </div>
             <div className="card-body" style={{ padding: '16px 20px' }}>
-              <div style={{ display: 'flex', gap: 12 }}>
-                <div style={{ textAlign: 'center', flex: 1, padding: '12px', background: '#eff6ff', borderRadius: 'var(--radius-md)', border: '1px solid #bfdbfe' }}>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: '#2563eb' }}>{stats.manualCount}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Manual</div>
-                </div>
-                <div style={{ textAlign: 'center', flex: 1, padding: '12px', background: '#faf5ff', borderRadius: 'var(--radius-md)', border: '1px solid #e9d5ff' }}>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: '#9333ea' }}>{stats.scanCount}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>AI Scan</div>
-                </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                <Link
+                  href="/transactions?source=manual"
+                  className="source-stat-box"
+                  style={{
+                    textAlign: 'center',
+                    padding: '12px 4px',
+                    background: '#eff6ff',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid #bfdbfe',
+                    textDecoration: 'none',
+                    display: 'block',
+                  }}
+                  title="Filter by Manual transactions"
+                >
+                  <div style={{ fontSize: 20, fontWeight: 700, color: '#2563eb' }}>{stats.manualCount}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#1e40af', marginTop: 3 }}>
+                    ✍️ Manual
+                  </div>
+                </Link>
+
+                <Link
+                  href="/transactions?source=scan"
+                  className="source-stat-box"
+                  style={{
+                    textAlign: 'center',
+                    padding: '12px 4px',
+                    background: '#faf5ff',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid #e9d5ff',
+                    textDecoration: 'none',
+                    display: 'block',
+                  }}
+                  title="Filter by AI Scan transactions"
+                >
+                  <div style={{ fontSize: 20, fontWeight: 700, color: '#9333ea' }}>{stats.scanCount}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#6b21a8', marginTop: 3 }}>
+                    🤖 AI Scan
+                  </div>
+                </Link>
+
+                <Link
+                  href="/transactions?source=import"
+                  className="source-stat-box"
+                  style={{
+                    textAlign: 'center',
+                    padding: '12px 4px',
+                    background: '#ecfdf5',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid #a7f3d0',
+                    textDecoration: 'none',
+                    display: 'block',
+                  }}
+                  title="Filter by Excel Import transactions"
+                >
+                  <div style={{ fontSize: 20, fontWeight: 700, color: '#059669' }}>{stats.importCount}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#065f46', marginTop: 3 }}>
+                    📊 Excel
+                  </div>
+                </Link>
               </div>
             </div>
           </div>
@@ -248,7 +305,7 @@ export default function DashboardPage() {
                     <td style={{ color: 'var(--text-muted)' }}>{tx.currency}</td>
                     <td>
                       <span className={`source-badge ${tx.source}`}>
-                        {tx.source === 'scan' ? '🤖' : '✍️'} {tx.source}
+                        {tx.source === 'scan' ? '🤖' : tx.source === 'import' ? '📊' : '✍️'} {tx.source === 'import' ? 'excel' : tx.source}
                       </span>
                     </td>
                   </tr>
