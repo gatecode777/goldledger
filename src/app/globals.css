@@ -17,13 +17,16 @@
   --bg-page:    #f5f6fa;
   --bg-surface: #ffffff;
   --bg-card:    #ffffff;
+  --card-bg:    #ffffff;
   --bg-hover:   #f8f8fc;
   --bg-input:   #f9fafb;
   --bg-muted:   #f3f4f8;
+  --bg-secondary: #f9fafb;
   --bg-sidebar: #ffffff;
 
   /* Borders */
   --border:      #e5e7f0;
+  --border-light:#e5e7f0;
   --border-md:   #d1d5e0;
   --border-gold: rgba(217, 119, 6, 0.35);
   --border-focus: rgba(217, 119, 6, 0.6);
@@ -3301,27 +3304,38 @@ body {
   display: flex;
   align-items: flex-start;
   gap: 14px;
-  background: var(--card-bg);
-  border: 1px solid var(--border-light);
-  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--gold-500);
+  border-radius: var(--radius-lg);
   padding: 18px 20px;
-  transition: box-shadow 0.15s;
+  box-shadow: var(--shadow-xs);
+  transition: all var(--transition);
 }
 
 .mt-stat-card:hover {
-  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+  border-color: var(--border-md);
+  border-top-color: var(--gold-600);
 }
 
 .mt-stat-card.highlight {
-  border-color: var(--gold-400);
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.04), rgba(245, 158, 11, 0.01));
+  border-top-color: var(--gold-600);
+  background: #ffffff;
 }
 
 .mt-stat-icon {
-  font-size: 28px;
-  line-height: 1;
+  font-size: 20px;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-muted, #f3f4f8);
+  border-radius: var(--radius-md, 4px);
   flex-shrink: 0;
-  margin-top: 2px;
+  line-height: 1;
 }
 
 .mt-stat-content {
@@ -3437,9 +3451,9 @@ body {
 /* Calculation Preview */
 .mt-calc-preview {
   margin-top: 20px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-light);
-  border-radius: 10px;
+  background: var(--bg-muted, #f3f4f8);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 4px);
   padding: 16px 20px;
 }
 
@@ -3473,7 +3487,7 @@ body {
 
 .mt-calc-divider {
   height: 1px;
-  background: var(--border-light);
+  background: var(--border);
   margin: 4px 0;
 }
 
@@ -3489,7 +3503,7 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 10px 0;
-  border-bottom: 1px solid var(--border-light);
+  border-bottom: 1px solid var(--border);
   font-size: 13.5px;
 }
 
