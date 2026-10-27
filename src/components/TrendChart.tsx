@@ -3,10 +3,11 @@
 import React, { useMemo } from 'react';
 import { Transaction } from '@/lib/types';
 import { formatShortDate } from '@/lib/formatters';
-import { convertToUSD } from '@/lib/currencies';
+import { convertCurrency, getCurrencySymbol } from '@/lib/currencies';
 
 interface TrendChartProps {
   transactions: Transaction[];
+  currency?: string;
 }
 
 interface DayPoint {
@@ -18,18 +19,18 @@ interface DayPoint {
 
 // React.memo: only re-renders when the transactions array reference changes,
 // not on every dashboard state update (e.g. filter changes, pagination, etc.)
-const TrendChart = React.memo(function TrendChart({ transactions }: TrendChartProps) {
+const TrendChart = React.memo(function TrendChart({ transactions, currency = 'USD' }: TrendChartProps) {
   const points = useMemo<DayPoint[]>(() => {
     if (transactions.length === 0) return [];
 
-    // Group by date, converting to USD for consistency
+    // Group by date, converting to target currency for consistency
     const map = new Map<string, { buy: number; sell: number }>();
     transactions.forEach(tx => {
       const date = tx.dateTime.slice(0, 10); // YYYY-MM-DD
-      const usdValue = convertToUSD(tx.totalValue, tx.currency);
+      const convertedValue = convertCurrency(tx.totalValue, tx.currency, currency);
       const existing = map.get(date) ?? { buy: 0, sell: 0 };
-      if (tx.type === 'buy') existing.buy += usdValue;
-      else existing.sell += usdValue;
+      if (tx.type === 'buy') existing.buy += convertedValue;
+      else existing.sell += convertedValue;
       map.set(date, existing);
     });
 
@@ -80,10 +81,11 @@ const TrendChart = React.memo(function TrendChart({ transactions }: TrendChartPr
     y: scaleY(maxVal * t),
   }));
 
+  const currSymbol = getCurrencySymbol(currency);
   const fmtK = (v: number) =>
-    v >= 1_000_000 ? `$${(v / 1_000_000).toFixed(1)}M` :
-    v >= 1000 ? `$${(v / 1000).toFixed(0)}K` :
-    `$${v.toFixed(0)}`;
+    v >= 1_000_000 ? `${currSymbol}${(v / 1_000_000).toFixed(1)}M` :
+    v >= 1000 ? `${currSymbol}${(v / 1000).toFixed(0)}K` :
+    `${currSymbol}${v.toFixed(0)}`;
 
   // Determine which ticks to show on X-axis (at most 7)
   const step = Math.ceil(points.length / 7);
@@ -94,12 +96,12 @@ const TrendChart = React.memo(function TrendChart({ transactions }: TrendChartPr
       {/* Legend */}
       <div style={{ display: 'flex', gap: 20, marginBottom: 12, paddingLeft: PAD.left }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
-          <div style={{ width: 24, height: 3, background: '#4ade80', borderRadius: 2 }} />
-          Buy Volume (USD)
+          <div style={{ width: 24, height: 3, background: '#d97706', borderRadius: 'var(--radius-sm)' }} />
+          Buy Volume ({currency})
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
-          <div style={{ width: 24, height: 3, background: '#f87171', borderRadius: 2 }} />
-          Sell Volume (USD)
+          <div style={{ width: 24, height: 3, background: '#64748b', borderRadius: 'var(--radius-sm)' }} />
+          Sell Volume ({currency})
         </div>
       </div>
 
@@ -110,12 +112,12 @@ const TrendChart = React.memo(function TrendChart({ transactions }: TrendChartPr
       >
         <defs>
           <linearGradient id="buyGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stopColor="#4ade80" stopOpacity="0.25" />
-            <stop offset="100%" stopColor="#4ade80" stopOpacity="0" />
+            <stop offset="0%"   stopColor="#d97706" stopOpacity="0.22" />
+            <stop offset="100%" stopColor="#d97706" stopOpacity="0" />
           </linearGradient>
           <linearGradient id="sellGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stopColor="#f87171" stopOpacity="0.2" />
-            <stop offset="100%" stopColor="#f87171" stopOpacity="0" />
+            <stop offset="0%"   stopColor="#64748b" stopOpacity="0.15" />
+            <stop offset="100%" stopColor="#64748b" stopOpacity="0" />
           </linearGradient>
         </defs>
 
@@ -146,7 +148,7 @@ const TrendChart = React.memo(function TrendChart({ transactions }: TrendChartPr
         <path
           d={buyPath}
           fill="none"
-          stroke="#4ade80"
+          stroke="#d97706"
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -156,7 +158,7 @@ const TrendChart = React.memo(function TrendChart({ transactions }: TrendChartPr
         <path
           d={sellPath}
           fill="none"
-          stroke="#f87171"
+          stroke="#64748b"
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -165,8 +167,8 @@ const TrendChart = React.memo(function TrendChart({ transactions }: TrendChartPr
         {/* Data points */}
         {points.map((p, i) => (
           <g key={p.date}>
-            <circle cx={scaleX(i)} cy={scaleY(p.buyVolume)}  r="4" fill="#4ade80" />
-            <circle cx={scaleX(i)} cy={scaleY(p.sellVolume)} r="4" fill="#f87171" />
+            <circle cx={scaleX(i)} cy={scaleY(p.buyVolume)}  r="4" fill="#d97706" />
+            <circle cx={scaleX(i)} cy={scaleY(p.sellVolume)} r="4" fill="#64748b" />
           </g>
         ))}
 

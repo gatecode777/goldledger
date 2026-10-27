@@ -11,7 +11,7 @@ const TransactionSchema = new Schema(
     marketRate: { type: Number, required: true },
     purity: {
       type: String,
-      enum: ['24K', '22K', '21K', '18K', '14K', 'custom'],
+      enum: ['24K 999', '24K 995', '24K 991'],
       required: true,
     },
     customPurity: { type: String },
@@ -25,6 +25,12 @@ const TransactionSchema = new Schema(
     currency: { type: String, required: true },
     counterparty: { type: String, default: '' },
     notes: { type: String, default: '' },
+    paymentType: {
+      type: String,
+      enum: ['Cash', 'RTGS'],
+      default: 'Cash',
+    },
+    transactionId: { type: String, default: '' },
     source: {
       type: String,
       default: 'manual',

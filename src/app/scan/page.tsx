@@ -4,10 +4,10 @@ import React, { useState, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import TransactionForm from '@/components/TransactionForm';
-import { Transaction, TransactionType, Purity, WeightUnit } from '@/lib/types';
+import { Transaction, TransactionType, Purity, WeightUnit, PaymentType } from '@/lib/types';
 import { useTransactions } from '@/context/TransactionContext';
 import { useToast } from '@/components/Toast';
-import { CURRENCIES } from '@/lib/currencies';
+import { CURRENCIES, convertCurrency } from '@/lib/currencies';
 import { formatCurrency } from '@/lib/formatters';
 
 type ScanState = 'idle' | 'uploading' | 'processing' | 'done' | 'error';
@@ -15,6 +15,8 @@ type ScanState = 'idle' | 'uploading' | 'processing' | 'done' | 'error';
 interface ScannedItem {
   id: string;
   type: TransactionType;
+  paymentType?: PaymentType;
+  transactionId?: string;
   weight: number;
   weightUnit: WeightUnit;
   purity: Purity;
@@ -29,12 +31,9 @@ interface ScannedItem {
 }
 
 const PURITIES: { value: Purity; label: string }[] = [
-  { value: '24K', label: '24K (999)' },
-  { value: '22K', label: '22K (916)' },
-  { value: '21K', label: '21K (875)' },
-  { value: '18K', label: '18K (750)' },
-  { value: '14K', label: '14K (583)' },
-  { value: 'custom', label: 'Custom' },
+  { value: '24K 999', label: '24K (999)' },
+  { value: '24K 995', label: '24K (995)' },
+  { value: '24K 991', label: '24K (991)' },
 ];
 
 const WEIGHT_UNITS: { value: WeightUnit; label: string }[] = [
@@ -45,7 +44,7 @@ const WEIGHT_UNITS: { value: WeightUnit; label: string }[] = [
 
 export default function ScanPage() {
   const router = useRouter();
-  const { importTransactions, rateSettings } = useTransactions();
+  const { importTransactions, rateSettings, globalCurrency } = useTransactions();
   const { showToast } = useToast();
 
   const [scanState, setScanState] = useState<ScanState>('idle');
@@ -109,10 +108,10 @@ export default function ScanPage() {
           type: t.type === 'sell' ? 'sell' : 'buy',
           weight,
           weightUnit: t.weightUnit || 'gram',
-          purity: t.purity || '22K',
+          purity: (['24K 999', '24K 995', '24K 991'].includes(t.purity) ? t.purity : '24K 999'),
           customPurity: t.customPurity || '',
           goldPricePerUnit: price,
-          currency: t.currency || 'USD',
+          currency: t.currency || globalCurrency || 'USD',
           counterparty: t.counterparty || '',
           notes: t.notes || '',
           dateTime: t.dateTime || new Date().toISOString(),
@@ -176,7 +175,7 @@ export default function ScanPage() {
       type: 'buy',
       weight: 1,
       weightUnit: 'gram',
-      purity: '22K',
+      purity: '24K 999',
       goldPricePerUnit: defaultRefRate,
       currency: 'USD',
       counterparty: '',
@@ -210,12 +209,14 @@ export default function ScanPage() {
         goldPricePerUnit: item.goldPricePerUnit,
         marketRate: defaultRefRate,
         purity: item.purity,
-        customPurity: item.purity === 'custom' ? item.customPurity : undefined,
+        customPurity: undefined,
         weight: item.weight,
         weightUnit: item.weightUnit,
         dateTime: item.dateTime || new Date().toISOString(),
         currency: item.currency,
         counterparty: item.counterparty.trim(),
+        paymentType: item.paymentType || 'Cash',
+        transactionId: item.transactionId ? item.transactionId.trim() : undefined,
         notes: item.notes.trim(),
         source: 'scan',
         totalValue: item.weight * item.goldPricePerUnit,
@@ -308,6 +309,8 @@ export default function ScanPage() {
               goldPricePerUnit: single.goldPricePerUnit,
               currency: single.currency,
               counterparty: single.counterparty,
+              paymentType: single.paymentType || 'Cash',
+              transactionId: single.transactionId,
               notes: single.notes,
               dateTime: single.dateTime,
               totalValue: single.totalValue,
@@ -529,7 +532,15 @@ export default function ScanPage() {
                       <select
                         className="scan-batch-select"
                         value={item.currency}
-                        onChange={(e) => updateItem(item.id, { currency: e.target.value })}
+                        onChange={(e) => {
+                          const newCurr = e.target.value;
+                          const currentPrice = item.goldPricePerUnit || 0;
+                          const converted = convertCurrency(currentPrice, item.currency, newCurr);
+                          updateItem(item.id, {
+                            currency: newCurr,
+                            goldPricePerUnit: Number(converted.toFixed(2)),
+                          });
+                        }}
                       >
                         {CURRENCIES.map((c) => (
                           <option key={c.code} value={c.code}>

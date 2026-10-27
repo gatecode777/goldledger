@@ -11,6 +11,19 @@ export function formatCurrency(amount: number, currencyCode: string): string {
   return `${symbol} ${formatted}`;
 }
 
+export function formatCardCurrency(amount: number, currencyCode: string): string {
+  const info = CURRENCY_MAP[currencyCode];
+  const symbol = info?.symbol ?? currencyCode;
+  const isLarge = Math.abs(amount) >= 1000;
+  const isWhole = Math.abs(amount - Math.round(amount)) < 0.001;
+  const decimals = (isLarge || isWhole) ? 0 : 2;
+  const formatted = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(amount);
+  return `${symbol} ${formatted}`;
+}
+
 export function formatWeight(weight: number, unit: WeightUnit): string {
   const unitLabels: Record<WeightUnit, string> = {
     gram: 'g',
@@ -35,7 +48,9 @@ export function formatShortDate(isoString: string): string {
 
 export function purityLabel(purity: string, customPurity?: string): string {
   if (purity === 'custom' && customPurity) return customPurity;
-  return purity;
+  if (purity === '24K 995') return '24K 995';
+  if (purity === '24K 991') return '24K 991';
+  return '24K 999';
 }
 
 export function weightToGrams(weight: number, unit: WeightUnit): number {

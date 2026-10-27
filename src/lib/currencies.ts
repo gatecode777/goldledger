@@ -54,6 +54,27 @@ export function convertToUSD(amount: number, fromCurrency: string): number {
   return amount / info.rateToUSD;
 }
 
+export function convertCurrency(
+  amount: number,
+  fromCurrency: string,
+  toCurrency: string
+): number {
+  if (!amount || isNaN(amount)) return 0;
+  if (fromCurrency === toCurrency) return amount;
+  const inUSD = convertToUSD(amount, fromCurrency);
+  return convertUSDTo(inUSD, toCurrency);
+}
+
+export function formatConvertedPrice(val: number): string {
+  if (isNaN(val) || val <= 0) return '';
+  // If whole number, format without decimals
+  if (Math.abs(val - Math.round(val)) < 0.0001) {
+    return Math.round(val).toString();
+  }
+  // Otherwise round to 2 decimals
+  return Number(val.toFixed(2)).toString();
+}
+
 export function getCurrencySymbol(code: string): string {
   return CURRENCY_MAP[code]?.symbol ?? code;
 }

@@ -3,12 +3,12 @@
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { useTransactions } from '@/context/TransactionContext';
-import { convertToUSD } from '@/lib/currencies';
-import { formatCurrency, formatDate, purityLabel, weightToGrams } from '@/lib/formatters';
+import { CURRENCIES, convertToUSD, convertUSDTo, convertCurrency } from '@/lib/currencies';
+import { formatCurrency, formatCardCurrency, formatDate, purityLabel, weightToGrams } from '@/lib/formatters';
 import TrendChart from '@/components/TrendChart';
 
 export default function DashboardPage() {
-  const { transactions, rateSettings, loading, error } = useTransactions();
+  const { transactions, rateSettings, loading, error, globalCurrency, setGlobalCurrency } = useTransactions();
 
   const stats = useMemo(() => {
     const buys  = transactions.filter((t) => t.type === 'buy');
@@ -17,6 +17,10 @@ export default function DashboardPage() {
     const totalBuyUSD  = buys.reduce((s, t)  => s + convertToUSD(t.totalValue, t.currency), 0);
     const totalSellUSD = sells.reduce((s, t) => s + convertToUSD(t.totalValue, t.currency), 0);
     const netUSD = totalBuyUSD - totalSellUSD;
+
+    const totalBuyGlobal  = convertUSDTo(totalBuyUSD, globalCurrency);
+    const totalSellGlobal = convertUSDTo(totalSellUSD, globalCurrency);
+    const netGlobal       = totalBuyGlobal - totalSellGlobal;
 
     const totalWeightGrams = transactions.reduce((s, t) => {
       const g = weightToGrams(t.weight, t.weightUnit);
@@ -41,15 +45,18 @@ export default function DashboardPage() {
 
     return {
       totalBuyUSD, totalSellUSD, netUSD,
+      totalBuyGlobal, totalSellGlobal, netGlobal,
       totalWeightGrams,
       buyCount: buys.length, sellCount: sells.length,
       latestFiveTransactions, purityBreakdown,
       scanCount, manualCount, importCount,
     };
-  }, [transactions]);
+  }, [transactions, globalCurrency]);
 
   const referenceRate = rateSettings?.referenceRateUSD ?? 0;
+  const referenceRateGlobal = convertUSDTo(referenceRate, globalCurrency);
   const goldValue = (stats.totalWeightGrams / 31.1035) * referenceRate;
+  const goldValueGlobal = convertUSDTo(goldValue, globalCurrency);
 
   if (loading) {
     return (
@@ -76,10 +83,24 @@ export default function DashboardPage() {
         <div>
           <h1 className="page-title">Dashboard</h1>
           <p className="page-subtitle">
-            Live overview of your gold transaction portfolio
+            Live overview of your gold transaction portfolio in {globalCurrency}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="global-currency-badge" title="Change global display currency across entire project">
+            <label>Currency:</label>
+            <select
+              className="global-currency-select"
+              value={globalCurrency}
+              onChange={(e) => setGlobalCurrency(e.target.value)}
+            >
+              {CURRENCIES.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.code} ({c.symbol}) — {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
           <Link href="/transactions/new" className="btn btn-primary">
             ➕ New Transaction
           </Link>
@@ -88,43 +109,55 @@ export default function DashboardPage() {
 
       {/* Stat Cards */}
       <div className="stat-grid">
-        <div className="stat-card gold">
+        <div className="stat-card">
           <div className="stat-label">Total Transactions</div>
-          <div className="stat-value gold">{transactions.length}</div>
+          <div className="stat-value">{transactions.length}</div>
           <div className="stat-sub">{stats.buyCount} buys · {stats.sellCount} sells</div>
           <div className="stat-icon">📋</div>
         </div>
 
-        <div className="stat-card green">
+        <div className="stat-card">
           <div className="stat-label">Total Buy Volume</div>
-          <div className="stat-value green">
-            ${stats.totalBuyUSD.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+          <div
+            className="stat-value"
+            title={formatCurrency(stats.totalBuyGlobal, globalCurrency)}
+          >
+            {formatCardCurrency(stats.totalBuyGlobal, globalCurrency)}
           </div>
-          <div className="stat-sub">USD equivalent</div>
+          <div className="stat-sub">{globalCurrency} equivalent</div>
           <div className="stat-icon">📈</div>
         </div>
 
-        <div className="stat-card red">
+        <div className="stat-card">
           <div className="stat-label">Total Sell Volume</div>
-          <div className="stat-value red">
-            ${stats.totalSellUSD.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+          <div
+            className="stat-value"
+            title={formatCurrency(stats.totalSellGlobal, globalCurrency)}
+          >
+            {formatCardCurrency(stats.totalSellGlobal, globalCurrency)}
           </div>
-          <div className="stat-sub">USD equivalent</div>
+          <div className="stat-sub">{globalCurrency} equivalent</div>
           <div className="stat-icon">📉</div>
         </div>
 
-        <div className={`stat-card ${stats.netUSD >= 0 ? 'green' : 'red'}`}>
-          <div className="stat-label">Net Position (USD)</div>
-          <div className={`stat-value ${stats.netUSD >= 0 ? 'green' : 'red'}`} style={{ color: stats.netUSD >= 0 ? '#16a34a' : '#dc2626' }}>
-            {stats.netUSD >= 0 ? '+' : ''}${Math.abs(stats.netUSD).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+        <div className="stat-card">
+          <div className="stat-label">Net Position ({globalCurrency})</div>
+          <div
+            className="stat-value"
+            title={`${stats.netGlobal >= 0 ? '+' : '−'}${formatCurrency(Math.abs(stats.netGlobal), globalCurrency)}`}
+          >
+            {stats.netGlobal >= 0 ? '+' : '−'}{formatCardCurrency(Math.abs(stats.netGlobal), globalCurrency)}
           </div>
           <div className="stat-sub">Buy − Sell</div>
           <div className="stat-icon">⚖️</div>
         </div>
 
-        <div className="stat-card blue">
+        <div className="stat-card">
           <div className="stat-label">Net Gold Weight</div>
-          <div className="stat-value" style={{ color: '#2563eb', fontSize: 22 }}>
+          <div
+            className="stat-value"
+            title={`${stats.totalWeightGrams >= 0 ? '' : '−'}${Math.abs(stats.totalWeightGrams).toFixed(2)} g`}
+          >
             {stats.totalWeightGrams >= 0 ? '' : '−'}
             {Math.abs(stats.totalWeightGrams).toFixed(2)} g
           </div>
@@ -134,12 +167,15 @@ export default function DashboardPage() {
           <div className="stat-icon">⚖️</div>
         </div>
 
-        <div className="stat-card purple">
+        <div className="stat-card">
           <div className="stat-label">Est. Portfolio Value</div>
-          <div className="stat-value" style={{ color: '#9333ea', fontSize: 22 }}>
-            ${goldValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+          <div
+            className="stat-value"
+            title={formatCurrency(goldValueGlobal, globalCurrency)}
+          >
+            {formatCardCurrency(goldValueGlobal, globalCurrency)}
           </div>
-          <div className="stat-sub">@ ${referenceRate}/troy oz</div>
+          <div className="stat-sub">@ {formatCurrency(referenceRateGlobal, globalCurrency)}/troy oz</div>
           <div className="stat-icon">💰</div>
         </div>
       </div>
@@ -150,10 +186,10 @@ export default function DashboardPage() {
         <div className="card">
           <div className="card-header">
             <span className="card-title">📈 Volume Trend</span>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 400 }}>USD equivalent, by day</span>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 400 }}>{globalCurrency} equivalent, by day</span>
           </div>
           <div className="card-body">
-            <TrendChart transactions={transactions} />
+            <TrendChart transactions={transactions} currency={globalCurrency} />
           </div>
         </div>
 
@@ -199,61 +235,28 @@ export default function DashboardPage() {
                 <Link
                   href="/transactions?source=manual"
                   className="source-stat-box"
-                  style={{
-                    textAlign: 'center',
-                    padding: '12px 4px',
-                    background: '#eff6ff',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid #bfdbfe',
-                    textDecoration: 'none',
-                    display: 'block',
-                  }}
                   title="Filter by Manual transactions"
                 >
-                  <div style={{ fontSize: 20, fontWeight: 700, color: '#2563eb' }}>{stats.manualCount}</div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: '#1e40af', marginTop: 3 }}>
-                    ✍️ Manual
-                  </div>
+                  <div className="source-stat-count">{stats.manualCount}</div>
+                  <div className="source-stat-label">✍️ Manual</div>
                 </Link>
 
                 <Link
                   href="/transactions?source=scan"
                   className="source-stat-box"
-                  style={{
-                    textAlign: 'center',
-                    padding: '12px 4px',
-                    background: '#faf5ff',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid #e9d5ff',
-                    textDecoration: 'none',
-                    display: 'block',
-                  }}
                   title="Filter by AI Scan transactions"
                 >
-                  <div style={{ fontSize: 20, fontWeight: 700, color: '#9333ea' }}>{stats.scanCount}</div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: '#6b21a8', marginTop: 3 }}>
-                    🤖 AI Scan
-                  </div>
+                  <div className="source-stat-count">{stats.scanCount}</div>
+                  <div className="source-stat-label">🤖 AI Scan</div>
                 </Link>
 
                 <Link
                   href="/transactions?source=import"
                   className="source-stat-box"
-                  style={{
-                    textAlign: 'center',
-                    padding: '12px 4px',
-                    background: '#ecfdf5',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid #a7f3d0',
-                    textDecoration: 'none',
-                    display: 'block',
-                  }}
                   title="Filter by Excel Import transactions"
                 >
-                  <div style={{ fontSize: 20, fontWeight: 700, color: '#059669' }}>{stats.importCount}</div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: '#065f46', marginTop: 3 }}>
-                    📊 Excel
-                  </div>
+                  <div className="source-stat-count">{stats.importCount}</div>
+                  <div className="source-stat-label">📊 Excel</div>
                 </Link>
               </div>
             </div>
@@ -287,6 +290,7 @@ export default function DashboardPage() {
                   <th>Weight</th>
                   <th>Total Value</th>
                   <th>Currency</th>
+                  <th>Payment</th>
                   <th>Source</th>
                 </tr>
               </thead>
@@ -301,8 +305,34 @@ export default function DashboardPage() {
                     <td style={{ color: 'var(--text-secondary)' }}>{formatDate(tx.dateTime)}</td>
                     <td><span className="purity-tag">{purityLabel(tx.purity, tx.customPurity)}</span></td>
                     <td>{tx.weight} {tx.weightUnit.replace('_', ' ')}</td>
-                    <td className="font-bold">{formatCurrency(tx.totalValue, tx.currency)}</td>
+                    <td className="font-bold">
+                      <div>{formatCurrency(tx.totalValue, tx.currency)}</div>
+                      {tx.currency !== globalCurrency && (
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500, marginTop: 2 }}>
+                          ≈ {formatCurrency(convertCurrency(tx.totalValue, tx.currency, globalCurrency), globalCurrency)}
+                        </div>
+                      )}
+                    </td>
                     <td style={{ color: 'var(--text-muted)' }}>{tx.currency}</td>
+                    <td>
+                      <span className={`payment-badge ${(tx.paymentType || 'Cash').toLowerCase()}`}>
+                        {tx.paymentType === 'RTGS' ? '🏦 RTGS' : '💵 Cash'}
+                      </span>
+                      {tx.paymentType === 'RTGS' && tx.transactionId && (
+                        <div
+                          style={{
+                            fontSize: 10.5,
+                            color: 'var(--text-secondary)',
+                            fontFamily: 'monospace',
+                            marginTop: 3,
+                            letterSpacing: '0.02em',
+                          }}
+                          title={`Transaction ID: ${tx.transactionId}`}
+                        >
+                          #{tx.transactionId}
+                        </div>
+                      )}
+                    </td>
                     <td>
                       <span className={`source-badge ${tx.source}`}>
                         {tx.source === 'scan' ? '🤖' : tx.source === 'import' ? '📊' : '✍️'} {tx.source === 'import' ? 'excel' : tx.source}

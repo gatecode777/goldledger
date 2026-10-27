@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Transaction, TransactionType, Purity, WeightUnit, TransactionSource } from '@/lib/types';
-import { CURRENCIES } from '@/lib/currencies';
+import { Transaction, TransactionType, Purity, WeightUnit, TransactionSource, Counterparty, PaymentType } from '@/lib/types';
+import { CURRENCIES, convertCurrency, convertUSDTo, formatConvertedPrice } from '@/lib/currencies';
 import { useTransactions } from '@/context/TransactionContext';
 import { useToast } from '@/components/Toast';
-import { weightToGrams } from '@/lib/formatters';
+import { formatCurrency, weightToGrams } from '@/lib/formatters';
+import CounterpartySelect from '@/components/CounterpartySelect';
 
 interface TransactionFormProps {
   initialValues?: Partial<Transaction>;
@@ -20,12 +21,9 @@ interface TransactionFormProps {
 }
 
 const PURITIES: { value: Purity; label: string; sub: string }[] = [
-  { value: '24K', label: '24K', sub: '999' },
-  { value: '22K', label: '22K', sub: '916' },
-  { value: '21K', label: '21K', sub: '875' },
-  { value: '18K', label: '18K', sub: '750' },
-  { value: '14K', label: '14K', sub: '583' },
-  { value: 'custom', label: 'Custom', sub: '…' },
+  { value: '24K 999', label: '24K', sub: '999' },
+  { value: '24K 995', label: '24K', sub: '995' },
+  { value: '24K 991', label: '24K', sub: '991' },
 ];
 
 const WEIGHT_UNITS: { value: WeightUnit; label: string; short: string }[] = [
@@ -47,6 +45,8 @@ type SuccessPayload = {
   weightUnit: WeightUnit;
   currency: string;
   counterparty: string;
+  paymentType: PaymentType;
+  transactionId?: string;
   marketRate: string;
   totalValue: number;
 };
@@ -60,31 +60,67 @@ export default function TransactionForm({
   voucherMode = false,
 }: TransactionFormProps) {
   const router = useRouter();
-  const { addTransaction, updateTransaction, rateSettings } = useTransactions();
+  const { addTransaction, updateTransaction, rateSettings, globalCurrency, counterparties } = useTransactions();
   const { showToast } = useToast();
   const counterpartyRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
   const referenceRate = rateSettings?.referenceRateUSD ?? 2355;
+  const initialCurrency = initialValues?.currency ?? (editId ? 'USD' : (globalCurrency || 'USD'));
 
   // ── Form state ──────────────────────────────────────────────────────────────
   const [type, setType]               = useState<TransactionType>(initialValues?.type ?? 'buy');
-  const [goldPrice, setGoldPrice]     = useState(String(initialValues?.goldPricePerUnit ?? referenceRate));
+  const [currency, setCurrency]       = useState(initialCurrency);
+  const [goldPrice, setGoldPrice]     = useState(
+    initialValues?.goldPricePerUnit !== undefined
+      ? String(initialValues.goldPricePerUnit)
+      : formatConvertedPrice(convertUSDTo(referenceRate, initialCurrency))
+  );
   const [marketRate, setMarketRate]   = useState(String(initialValues?.marketRate ?? referenceRate));
-  const [purity, setPurity]           = useState<Purity>(initialValues?.purity ?? '22K');
+  const [purity, setPurity]           = useState<Purity>(initialValues?.purity ?? '24K 999');
   const [customPurity, setCustomPurity] = useState(initialValues?.customPurity ?? '');
   const [weight, setWeight]           = useState(String(initialValues?.weight ?? ''));
   const [weightUnit, setWeightUnit]   = useState<WeightUnit>(initialValues?.weightUnit ?? 'gram');
   const [dateTime, setDateTime]       = useState(
     initialValues?.dateTime ? initialValues.dateTime.slice(0, 16) : getNow()
   );
-  const [currency, setCurrency]       = useState(initialValues?.currency ?? 'USD');
   const [counterparty, setCounterparty] = useState(initialValues?.counterparty ?? '');
+  const [paymentType, setPaymentType] = useState<PaymentType>(initialValues?.paymentType ?? 'Cash');
+  const [transactionId, setTransactionId] = useState(initialValues?.transactionId ?? '');
   const [notes, setNotes]             = useState(initialValues?.notes ?? '');
   const [errors, setErrors]           = useState<Record<string, string>>({});
   const [submitting, setSubmitting]   = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [successPayload, setSuccessPayload] = useState<SuccessPayload | null>(null);
+
+  // ── Handle selecting a saved buyer or seller ───────────────────────────────
+  const handleSelectCounterparty = useCallback((party: Counterparty) => {
+    if (party.defaultPrice && party.defaultPrice > 0) {
+      setGoldPrice(String(party.defaultPrice));
+    }
+    if (party.currency && party.currency !== currency) {
+      setCurrency(party.currency);
+    }
+    if (party.weightUnit && party.weightUnit !== weightUnit) {
+      setWeightUnit(party.weightUnit);
+    }
+  }, [currency, weightUnit]);
+
+  // ── Handle Currency Change with Automatic Price Conversion ──────────────────
+  const handleCurrencyChange = useCallback((newCurrency: string) => {
+    if (newCurrency === currency) return;
+
+    const currentPriceNum = parseFloat(goldPrice);
+    if (!isNaN(currentPriceNum) && currentPriceNum > 0) {
+      const converted = convertCurrency(currentPriceNum, currency, newCurrency);
+      setGoldPrice(formatConvertedPrice(converted));
+    } else if (referenceRate) {
+      const converted = convertUSDTo(referenceRate, newCurrency);
+      setGoldPrice(formatConvertedPrice(converted));
+    }
+
+    setCurrency(newCurrency);
+  }, [currency, goldPrice, referenceRate]);
 
   // ── Sync reference rate ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -92,7 +128,8 @@ export default function TransactionForm({
       setMarketRate(String(rateSettings.referenceRateUSD));
     }
     if (!initialValues?.goldPricePerUnit && rateSettings) {
-      setGoldPrice(String(rateSettings.referenceRateUSD));
+      const converted = convertUSDTo(rateSettings.referenceRateUSD, currency);
+      setGoldPrice(formatConvertedPrice(converted));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rateSettings?.referenceRateUSD]);
@@ -165,6 +202,11 @@ export default function TransactionForm({
     [weightUnit]
   );
 
+  const marketRateInCurrency = useMemo(() => {
+    const rateNum = parseFloat(marketRate || '0');
+    return convertUSDTo(rateNum, currency);
+  }, [marketRate, currency]);
+
   // ── Validation ───────────────────────────────────────────────────────────────
   function validate(): boolean {
     const e: Record<string, string> = {};
@@ -174,8 +216,6 @@ export default function TransactionForm({
       e.goldPrice = 'Enter a positive price';
     if (!marketRate || isNaN(parseFloat(marketRate)) || parseFloat(marketRate) <= 0)
       e.marketRate = 'Enter a positive market rate';
-    if (purity === 'custom' && !customPurity.trim())
-      e.customPurity = 'Specify custom purity';
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -191,12 +231,14 @@ export default function TransactionForm({
       goldPricePerUnit: parseFloat(goldPrice),
       marketRate: parseFloat(marketRate),
       purity,
-      customPurity: purity === 'custom' ? customPurity : undefined,
+      customPurity: undefined,
       weight: parseFloat(weight),
       weightUnit,
       dateTime: new Date(dateTime).toISOString(),
       currency,
       counterparty: counterparty.trim(),
+      paymentType,
+      transactionId: paymentType === 'RTGS' ? transactionId.trim() : undefined,
       notes: notes.trim(),
       source,
       totalValue: totalValue ?? 0,
@@ -221,6 +263,8 @@ export default function TransactionForm({
             weightUnit,
             currency,
             counterparty,
+            paymentType,
+            transactionId: paymentType === 'RTGS' ? transactionId.trim() : undefined,
             marketRate,
             totalValue: totalValue ?? 0,
           });
@@ -235,7 +279,7 @@ export default function TransactionForm({
     }
   }
 
-  // ── "New Similar" — keeps purity, unit, currency, counterparty, market rate ─
+  // ── "New Similar" — keeps purity, unit, currency, counterparty, payment type, market rate ─
   function handleNewSimilar() {
     if (!successPayload) return;
     setType(successPayload.type);
@@ -244,8 +288,10 @@ export default function TransactionForm({
     setWeightUnit(successPayload.weightUnit);
     setCurrency(successPayload.currency);
     setCounterparty(successPayload.counterparty);
+    setPaymentType(successPayload.paymentType);
+    setTransactionId('');
     setMarketRate(successPayload.marketRate);
-    setGoldPrice(String(referenceRate));
+    setGoldPrice(formatConvertedPrice(convertUSDTo(referenceRate, successPayload.currency)));
     setWeight('');
     setNotes('');
     setDateTime(getNow());
@@ -257,13 +303,16 @@ export default function TransactionForm({
   // ── "New Transaction" — full reset ──────────────────────────────────────────
   function handleNewTransaction() {
     setType('buy');
-    setPurity('22K');
+    setPurity('24K 999');
     setCustomPurity('');
     setWeightUnit('gram');
-    setCurrency('USD');
+    const defaultCurr = globalCurrency || 'USD';
+    setCurrency(defaultCurr);
     setCounterparty('');
+    setPaymentType('Cash');
+    setTransactionId('');
     setMarketRate(String(referenceRate));
-    setGoldPrice(String(referenceRate));
+    setGoldPrice(formatConvertedPrice(convertUSDTo(referenceRate, defaultCurr)));
     setWeight('');
     setNotes('');
     setDateTime(getNow());
@@ -290,7 +339,7 @@ export default function TransactionForm({
             <div className="voucher-success-sub">
               {currencyInfo?.symbol ?? currency}{' '}
               {successPayload.totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              {' '}· {successPayload.purity === 'custom' ? successPayload.customPurity : successPayload.purity}
+              {' '}· {successPayload.purity}
               {' '}· {successPayload.currency}
             </div>
             <div className="voucher-success-actions">
@@ -368,7 +417,7 @@ export default function TransactionForm({
 
           <div className="voucher-body">
 
-            {/* ── Section 1: Counterparty + Purity ── */}
+            {/* ── Section 1: Counterparty + Payment Type + Currency ── */}
             <div className="voucher-section">
               <div className="voucher-field-row">
                 {/* Counterparty */}
@@ -376,26 +425,71 @@ export default function TransactionForm({
                   <label className="voucher-label">
                     Counterparty / Dealer
                   </label>
-                  <input
-                    ref={counterpartyRef}
-                    type="text"
-                    className="voucher-input"
-                    placeholder="e.g. Tanishq, Local Market, Dubai Gold Souk…"
+                  <CounterpartySelect
                     value={counterparty}
-                    onChange={(e) => setCounterparty(e.target.value)}
+                    onChange={setCounterparty}
+                    onSelectCounterparty={handleSelectCounterparty}
+                    counterparties={counterparties}
+                    transactionType={type}
+                    inputRef={counterpartyRef}
                     tabIndex={1}
+                    placeholder="e.g. Tanishq, Local Dealer, Dubai Gold Souk…"
+                    className="voucher-input"
                   />
                 </div>
 
+                {/* Payment Type */}
+                <div className="voucher-field" style={{ maxWidth: 190, minWidth: 165 }}>
+                  <label className="voucher-label">
+                    Payment Type <span className="required">*</span>
+                  </label>
+                  <div className="payment-tabs">
+                    <button
+                      type="button"
+                      className={`payment-tab ${paymentType === 'Cash' ? 'active' : ''}`}
+                      onClick={() => setPaymentType('Cash')}
+                      tabIndex={-1}
+                    >
+                      💵 Cash
+                    </button>
+                    <button
+                      type="button"
+                      className={`payment-tab ${paymentType === 'RTGS' ? 'active' : ''}`}
+                      onClick={() => setPaymentType('RTGS')}
+                      tabIndex={-1}
+                    >
+                      🏦 RTGS
+                    </button>
+                  </div>
+                </div>
+
+                {/* Transaction ID (appears when RTGS is selected) */}
+                {paymentType === 'RTGS' && (
+                  <div className="voucher-field animate-fade-in" style={{ maxWidth: 210, minWidth: 165 }}>
+                    <label className="voucher-label">
+                      Transaction ID <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)' }}>(Optional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="voucher-input"
+                      placeholder="e.g. UTR / Ref No."
+                      value={transactionId}
+                      onChange={(e) => setTransactionId(e.target.value)}
+                      tabIndex={2}
+                    />
+                    <span className="voucher-hint">Bank UTR / Ref number</span>
+                  </div>
+                )}
+
                 {/* Currency */}
-                <div className="voucher-field" style={{ maxWidth: 180 }}>
+                <div className="voucher-field" style={{ maxWidth: 175 }}>
                   <label className="voucher-label">
                     Currency <span className="required">*</span>
                   </label>
                   <select
                     className="voucher-select"
                     value={currency}
-                    onChange={(e) => setCurrency(e.target.value)}
+                    onChange={(e) => handleCurrencyChange(e.target.value)}
                     tabIndex={2}
                   >
                     {CURRENCIES.map((c) => (
@@ -425,33 +519,15 @@ export default function TransactionForm({
                     className={`purity-pill ${purity === p.value ? 'active' : ''}`}
                     onClick={() => setPurity(p.value as Purity)}
                     tabIndex={-1}
-                    title={p.value !== 'custom' ? `${p.label} = ${p.sub} fine` : 'Custom purity'}
+                    title={`${p.label} ${p.sub} Fine`}
                   >
                     {p.label}
-                    {p.value !== 'custom' && (
-                      <span style={{ fontSize: 10, fontWeight: 500, opacity: 0.65, marginLeft: 3 }}>
-                        {p.sub}
-                      </span>
-                    )}
+                    <span style={{ fontSize: 10, fontWeight: 500, opacity: 0.65, marginLeft: 3 }}>
+                      {p.sub}
+                    </span>
                   </button>
                 ))}
               </div>
-              {purity === 'custom' && (
-                <div style={{ marginTop: 8 }}>
-                  <input
-                    type="text"
-                    className="purity-custom-input"
-                    placeholder='e.g. "20K" or "800 fine"'
-                    value={customPurity}
-                    onChange={(e) => setCustomPurity(e.target.value)}
-                    autoFocus
-                    tabIndex={3}
-                  />
-                  {errors.customPurity && (
-                    <div className="voucher-error" style={{ marginTop: 4 }}>{errors.customPurity}</div>
-                  )}
-                </div>
-              )}
             </div>
 
             {/* ── Section 3: Weight + Price + Market Rate ── */}
@@ -549,7 +625,7 @@ export default function TransactionForm({
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                       <path d="M6 9l6 6 6-6"/>
                     </svg>
-                    Market Rate (USD)
+                    Market Rate ({currency})
                   </button>
                   {showAdvanced && (
                     <div>
@@ -564,12 +640,19 @@ export default function TransactionForm({
                         tabIndex={8}
                       />
                       {errors.marketRate && <span className="voucher-error">{errors.marketRate}</span>}
-                      <span className="voucher-hint">USD/troy oz reference</span>
+                      <span className="voucher-hint">
+                        USD/troy oz reference {currency !== 'USD' ? `(≈ ${formatCurrency(marketRateInCurrency, currency)} / ozt)` : ''}
+                      </span>
                     </div>
                   )}
                   {!showAdvanced && (
                     <div style={{ fontSize: 13, color: 'var(--text-muted)', paddingTop: 6 }}>
-                      ${parseFloat(marketRate || '0').toLocaleString()} / ozt
+                      {formatCurrency(marketRateInCurrency, currency)} / ozt
+                      {currency !== 'USD' && (
+                        <span style={{ fontSize: 11, marginLeft: 6, opacity: 0.75 }}>
+                          (${parseFloat(marketRate || '0').toLocaleString()} USD)
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -597,11 +680,9 @@ export default function TransactionForm({
                 <div className="breakdown">
                   @ {currencyInfo?.symbol}{parseFloat(goldPrice || '0').toLocaleString()} / {unitShort}
                 </div>
-                {purity !== 'custom' && (
-                  <div className="breakdown">
-                    {purity} · {currency}
-                  </div>
-                )}
+                <div className="breakdown">
+                  {purity} · {currency}
+                </div>
               </div>
             )}
           </div>
@@ -680,7 +761,7 @@ export default function TransactionForm({
         {/* Market Rate */}
         <div className="form-group">
           <label className="form-label">
-            Market Spot Rate (USD/troy oz)
+            Market Spot Rate ({currency}/troy oz)
             {isLowConf('marketRate') && <span className="confidence-low">⚠ Low confidence</span>}
           </label>
           <input
@@ -692,7 +773,11 @@ export default function TransactionForm({
             step="0.01" min="0"
           />
           {errors.marketRate && <span className="form-error">{errors.marketRate}</span>}
-          <span className="form-hint">Used for USD reference tracking</span>
+          <span className="form-hint">
+            {currency !== 'USD'
+              ? `≈ ${formatCurrency(marketRateInCurrency, currency)} / ozt (USD ref: $${parseFloat(marketRate || '0').toLocaleString()} / ozt)`
+              : 'Used for USD reference tracking'}
+          </span>
         </div>
 
         {/* Purity */}
@@ -707,27 +792,15 @@ export default function TransactionForm({
             onChange={(e) => setPurity(e.target.value as Purity)}
           >
             {PURITIES.map((p) => (
-              <option key={p.value} value={p.value}>{p.label}{p.value !== 'custom' ? ` — ${p.sub} Fine` : '…'}</option>
+              <option key={p.value} value={p.value}>{p.label} — {p.sub} Fine</option>
             ))}
           </select>
-          {purity === 'custom' && (
-            <div style={{ marginTop: 8 }}>
-              <input
-                type="text"
-                className="form-input"
-                placeholder='e.g. "20K" or "800 fine"'
-                value={customPurity}
-                onChange={(e) => setCustomPurity(e.target.value)}
-              />
-              {errors.customPurity && <span className="form-error">{errors.customPurity}</span>}
-            </div>
-          )}
         </div>
 
         {/* Currency */}
         <div className="form-group">
           <label className="form-label">Currency <span className="required">*</span></label>
-          <select className="form-select" value={currency} onChange={(e) => setCurrency(e.target.value)}>
+          <select className="form-select" value={currency} onChange={(e) => handleCurrencyChange(e.target.value)}>
             {CURRENCIES.map((c) => (
               <option key={c.code} value={c.code}>{c.code} — {c.name} ({c.symbol})</option>
             ))}
@@ -736,6 +809,44 @@ export default function TransactionForm({
             <span className="form-hint">1 USD = {currencyInfo.rateToUSD} {currency}</span>
           )}
         </div>
+
+        {/* Payment Type */}
+        <div className="form-group">
+          <label className="form-label">Payment Type <span className="required">*</span></label>
+          <div className="payment-tabs" style={{ marginTop: 2 }}>
+            <button
+              type="button"
+              className={`payment-tab ${paymentType === 'Cash' ? 'active' : ''}`}
+              onClick={() => setPaymentType('Cash')}
+            >
+              💵 Cash
+            </button>
+            <button
+              type="button"
+              className={`payment-tab ${paymentType === 'RTGS' ? 'active' : ''}`}
+              onClick={() => setPaymentType('RTGS')}
+            >
+              🏦 RTGS
+            </button>
+          </div>
+        </div>
+
+        {/* Transaction ID (shown when RTGS is selected) */}
+        {paymentType === 'RTGS' && (
+          <div className="form-group animate-fade-in">
+            <label className="form-label">
+              Transaction ID <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)' }}>(Optional)</span>
+            </label>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="e.g. UTR / Ref No."
+              value={transactionId}
+              onChange={(e) => setTransactionId(e.target.value)}
+            />
+            <span className="form-hint">Bank UTR / RTGS reference</span>
+          </div>
+        )}
 
         {/* Weight */}
         <div className="form-group">
@@ -786,12 +897,14 @@ export default function TransactionForm({
         {/* Counterparty */}
         <div className="form-group">
           <label className="form-label">Counterparty / Dealer</label>
-          <input
-            type="text"
-            className="form-input"
-            placeholder="e.g. Dubai Gold Souk, Booth #12"
+          <CounterpartySelect
             value={counterparty}
-            onChange={(e) => setCounterparty(e.target.value)}
+            onChange={setCounterparty}
+            onSelectCounterparty={handleSelectCounterparty}
+            counterparties={counterparties}
+            transactionType={type}
+            placeholder="e.g. Dubai Gold Souk, Booth #12"
+            className="form-input"
           />
         </div>
 

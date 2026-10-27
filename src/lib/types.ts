@@ -1,7 +1,26 @@
 export type TransactionType = 'buy' | 'sell';
-export type Purity = '24K' | '22K' | '21K' | '18K' | '14K' | 'custom';
+export type Purity =
+  | '24K 999'
+  | '24K 995'
+  | '24K 991';
 export type WeightUnit = 'gram' | 'troy_oz' | 'tola';
 export type TransactionSource = 'manual' | 'scan' | 'import';
+export type CounterpartyType = 'buyer' | 'seller' | 'both';
+export type PaymentType = 'Cash' | 'RTGS';
+
+export interface Counterparty {
+  id: string;
+  name: string;
+  type: CounterpartyType;
+  defaultPrice: number;     // saved price per unit
+  currency: string;         // e.g. 'USD', 'INR', 'AED'
+  weightUnit?: WeightUnit;  // e.g. 'gram'
+  phone?: string;
+  notes?: string;
+  lastUsedAt?: string;      // ISO string
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 export interface Transaction {
   id: string;
@@ -18,6 +37,8 @@ export interface Transaction {
   notes: string;
   source: TransactionSource;
   totalValue: number;           // goldPricePerUnit * weight
+  paymentType?: PaymentType;    // 'Cash' | 'RTGS'
+  transactionId?: string;       // Optional RTGS / bank transfer reference ID
   // confidence flags — used for scan results
   lowConfidenceFields?: string[];
 }
@@ -27,7 +48,32 @@ export interface GoldRateSettings {
   lastUpdated: string;          // ISO string
 }
 
+export type MoneyTransferStatus = 'completed' | 'pending' | 'cancelled';
+
+export interface MoneyTransfer {
+  id: string;
+  senderName: string;
+  receiverName: string;
+  amount: number;               // original amount from sender
+  currency: string;             // currency of the transfer
+  senderFeePercent: number;     // default 0.1 (%)
+  receiverFeePercent: number;   // default 0.05 (%)
+  senderFee: number;            // amount × senderFeePercent / 100
+  receiverFee: number;          // amount × receiverFeePercent / 100
+  netProfit: number;            // senderFee − receiverFee
+  amountDelivered: number;      // amount − senderFee − receiverFee
+  paymentType: PaymentType;
+  transactionId?: string;       // RTGS reference
+  dateTime: string;             // ISO string
+  notes: string;
+  status: MoneyTransferStatus;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface AppState {
   transactions: Transaction[];
   rateSettings: GoldRateSettings;
+  counterparties?: Counterparty[];
+  moneyTransfers?: MoneyTransfer[];
 }

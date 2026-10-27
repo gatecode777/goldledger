@@ -1,5 +1,7 @@
 import * as XLSX from 'xlsx';
 import { Transaction, TransactionType, Purity, WeightUnit } from '@/lib/types';
+import { weightToGrams } from '@/lib/formatters';
+import { convertToUSD } from '@/lib/currencies';
 
 export interface ParsedRowResult {
   rowNumber: number;
@@ -25,13 +27,23 @@ export function exportTransactionsToExcel(
   const exportData = transactions.map((tx) => ({
     'Date & Time': tx.dateTime ? tx.dateTime.replace('T', ' ').slice(0, 16) : '',
     'Type': tx.type.toUpperCase(),
-    'Purity': tx.purity === 'custom' && tx.customPurity ? `${tx.customPurity} (Custom)` : tx.purity,
+    'Purity': tx.purity,
     'Weight': tx.weight,
     'Unit': tx.weightUnit,
     'Price Per Unit': tx.goldPricePerUnit,
     'Currency': tx.currency,
+    'Payment Type': tx.paymentType || 'Cash',
+    'Transaction ID': tx.transactionId || '',
     'Total Value': tx.totalValue,
     'Spot Rate (USD/oz)': tx.marketRate,
+    'Estimated P&L (USD)': (() => {
+      const g = weightToGrams(tx.weight, tx.weightUnit);
+      const oz = g / 31.1035;
+      const actualUSD = convertToUSD(tx.totalValue, tx.currency);
+      const benchmarkUSD = oz * tx.marketRate;
+      const pnl = tx.type === 'buy' ? benchmarkUSD - actualUSD : actualUSD - benchmarkUSD;
+      return Math.round(pnl * 100) / 100;
+    })(),
     'Counterparty / Dealer': tx.counterparty || '',
     'Source': tx.source || 'manual',
     'Notes': tx.notes || '',
@@ -64,54 +76,58 @@ export function downloadSampleExcelTemplate() {
     {
       'Date & Time': '2026-10-21 10:30',
       'Type': 'BUY',
-      'Purity': '24K',
+      'Purity': '24K 999',
       'Custom Purity': '',
       'Weight': 10,
       'Unit': 'gram',
       'Price Per Unit': 85.50,
       'Currency': 'USD',
+      'Payment Type': 'Cash',
       'Spot Rate (USD/oz)': 2650.00,
       'Counterparty / Dealer': 'Dubai Gold Souk',
-      'Notes': '999.9 Fine Minted Bar',
+      'Notes': '999 Fine Minted Bar',
     },
     {
       'Date & Time': '2026-10-21 12:15',
       'Type': 'SELL',
-      'Purity': '22K',
+      'Purity': '24K 995',
       'Custom Purity': '',
       'Weight': 25.5,
       'Unit': 'gram',
       'Price Per Unit': 7250,
       'Currency': 'INR',
+      'Payment Type': 'RTGS',
+      'Transaction ID': 'UTRN2026102199',
       'Spot Rate (USD/oz)': 2650.00,
       'Counterparty / Dealer': 'Tanishq Jewellers',
-      'Notes': 'Old jewelry liquidation',
+      'Notes': '995 Fine Gold Bar',
     },
     {
       'Date & Time': '2026-10-21 15:45',
       'Type': 'BUY',
-      'Purity': '24K',
+      'Purity': '24K 991',
       'Custom Purity': '',
       'Weight': 1,
       'Unit': 'tola',
       'Price Per Unit': 3420,
       'Currency': 'AED',
+      'Payment Type': 'Cash',
       'Spot Rate (USD/oz)': 2650.00,
       'Counterparty / Dealer': 'Emirates Gold Refinery',
-      'Notes': '1 Tola TT Bar',
+      'Notes': '1 Tola 991 TT Bar',
     },
     {
       'Date & Time': '2026-10-21 16:30',
       'Type': 'BUY',
-      'Purity': 'custom',
-      'Custom Purity': '20K 833',
+      'Purity': '24K 999',
+      'Custom Purity': '',
       'Weight': 15.0,
       'Unit': 'gram',
       'Price Per Unit': 68.20,
       'Currency': 'USD',
       'Spot Rate (USD/oz)': 2650.00,
       'Counterparty / Dealer': 'Local Bullion Exchange',
-      'Notes': 'Custom antique lot',
+      'Notes': 'Fine Gold Cast Bar',
     },
   ];
 
@@ -134,8 +150,8 @@ export function downloadSampleExcelTemplate() {
   const refRows = [
     { Column: 'Date & Time', Required: 'No (Defaults to now)', 'Allowed Values / Examples': 'YYYY-MM-DD HH:mm or YYYY-MM-DD' },
     { Column: 'Type', Required: 'Yes', 'Allowed Values / Examples': 'BUY or SELL' },
-    { Column: 'Purity', Required: 'Yes', 'Allowed Values / Examples': '24K, 22K, 21K, 18K, 14K, or custom' },
-    { Column: 'Custom Purity', Required: 'Only if Purity is custom', 'Allowed Values / Examples': 'e.g. 20K, 850 fine' },
+    { Column: 'Purity', Required: 'Yes', 'Allowed Values / Examples': '24K 999, 24K 995, 24K 991' },
+    { Column: 'Custom Purity', Required: 'Optional', 'Allowed Values / Examples': 'Optional notes or custom purity' },
     { Column: 'Weight', Required: 'Yes', 'Allowed Values / Examples': 'Positive number (e.g. 10.5)' },
     { Column: 'Unit', Required: 'Yes', 'Allowed Values / Examples': 'gram, tola, or troy_oz' },
     { Column: 'Price Per Unit', Required: 'Yes', 'Allowed Values / Examples': 'Gold price per weight unit (e.g. 85.50)' },
@@ -210,16 +226,12 @@ function parseExcelDate(val: any): string {
 
 // ── Normalize Purity ────────────────────────────────────────────────────────
 function normalizePurity(val: any): { purity: Purity; customPurity?: string } {
-  if (!val) return { purity: '24K' };
+  if (!val) return { purity: '24K 999' };
   const str = String(val).trim().toUpperCase();
 
-  if (str.includes('24') || str.includes('999')) return { purity: '24K' };
-  if (str.includes('22') || str.includes('916')) return { purity: '22K' };
-  if (str.includes('21') || str.includes('875')) return { purity: '21K' };
-  if (str.includes('18') || str.includes('750')) return { purity: '18K' };
-  if (str.includes('14') || str.includes('583') || str.includes('585')) return { purity: '14K' };
-
-  return { purity: 'custom', customPurity: String(val).trim() };
+  if (str.includes('991')) return { purity: '24K 991' };
+  if (str.includes('995')) return { purity: '24K 995' };
+  return { purity: '24K 999' };
 }
 
 // ── Normalize Weight Unit ───────────────────────────────────────────────────
@@ -300,9 +312,6 @@ export async function parseExcelTransactions(
     const purity: Purity = purityObj.purity;
     const customPurity = rawCustomPurity ? String(rawCustomPurity).trim() : purityObj.customPurity;
 
-    if (purity === 'custom' && !customPurity) {
-      errors.push('Purity is set to "custom" but no custom purity specification was provided');
-    }
 
     // Currency
     const rawCurrency = findValue(row, ['currency', 'curr']);
@@ -321,6 +330,14 @@ export async function parseExcelTransactions(
     const counterparty = String(findValue(row, ['counterparty', 'counterpartydealer', 'dealer', 'party', 'customer', 'vendor']) || '').trim();
     const notes = String(findValue(row, ['notes', 'note', 'remarks', 'description']) || '').trim();
 
+    // Payment Type
+    const rawPayment = findValue(row, ['paymenttype', 'payment', 'paymode', 'mode', 'method', 'typepayment']);
+    const paymentType: 'Cash' | 'RTGS' = (String(rawPayment || '').toUpperCase().includes('RTGS')) ? 'RTGS' : 'Cash';
+
+    // Transaction ID
+    const rawTxId = findValue(row, ['transactionid', 'txnid', 'utr', 'utrno', 'refno', 'referenceno', 'referencenumber']);
+    const transactionId = rawTxId ? String(rawTxId).trim() : undefined;
+
     // Total Value
     const rawTotal = findValue(row, ['totalvalue', 'total', 'totalamount']);
     const totalNum = rawTotal ? parseFloat(String(rawTotal).replace(/,/g, '')) : (weightNum * priceNum);
@@ -332,12 +349,14 @@ export async function parseExcelTransactions(
         goldPricePerUnit: priceNum,
         marketRate,
         purity,
-        customPurity: purity === 'custom' ? customPurity : undefined,
+        customPurity: undefined,
         weight: weightNum,
         weightUnit,
         dateTime,
         currency,
         counterparty,
+        paymentType,
+        transactionId: paymentType === 'RTGS' ? transactionId : undefined,
         notes,
         source: 'import',
         totalValue,

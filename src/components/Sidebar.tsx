@@ -5,25 +5,31 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import { useTransactions } from '@/context/TransactionContext';
+import { CURRENCIES, convertUSDTo } from '@/lib/currencies';
+import { formatCurrency } from '@/lib/formatters';
 
 const navItems = [
-  { href: '/',             icon: '📊', label: 'Dashboard' },
-  { href: '/transactions', icon: '📋', label: 'Transaction Log' },
-  { href: '/scan',         icon: '🤖', label: 'AI Scan' },
-  { href: '/settings',     icon: '⚙️',  label: 'Gold Rate Settings' },
+  { href: '/',               icon: '📊', label: 'Dashboard' },
+  { href: '/transactions',   icon: '📋', label: 'Transaction Log' },
+  { href: '/money-transfers', icon: '💸', label: 'Money Transfer' },
+  { href: '/counterparties', icon: '👥', label: 'Buyers & Sellers' },
+  { href: '/scan',           icon: '🤖', label: 'AI Scan' },
+  { href: '/settings',       icon: '⚙️',  label: 'Gold Rate Settings' },
 ];
 
 // React.memo — prevents re-render when parent re-renders but pathname/data unchanged
 const Sidebar = React.memo(function Sidebar() {
   const pathname = usePathname();
-  const { transactions, rateSettings } = useTransactions();
+  const { transactions, counterparties, moneyTransfers, rateSettings, globalCurrency, setGlobalCurrency } = useTransactions();
 
   // Only recompute when the array length changes, not on every array reference change
   const txCount = useMemo(() => transactions.length, [transactions]);
-  const referenceRate = useMemo(
-    () => (rateSettings?.referenceRateUSD ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 }),
-    [rateSettings?.referenceRateUSD]
-  );
+  const partyCount = useMemo(() => counterparties?.length ?? 0, [counterparties]);
+  const mtCount = useMemo(() => moneyTransfers?.length ?? 0, [moneyTransfers]);
+  const convertedRate = useMemo(() => {
+    const rateUSD = rateSettings?.referenceRateUSD ?? 0;
+    return convertUSDTo(rateUSD, globalCurrency);
+  }, [rateSettings?.referenceRateUSD, globalCurrency]);
 
   return (
     <aside className="sidebar">
@@ -57,6 +63,12 @@ const Sidebar = React.memo(function Sidebar() {
               {item.href === '/transactions' && (
                 <span className="nav-badge">{txCount}</span>
               )}
+              {item.href === '/money-transfers' && mtCount > 0 && (
+                <span className="nav-badge">{mtCount}</span>
+              )}
+              {item.href === '/counterparties' && partyCount > 0 && (
+                <span className="nav-badge">{partyCount}</span>
+              )}
             </Link>
           );
         })}
@@ -70,10 +82,35 @@ const Sidebar = React.memo(function Sidebar() {
 
       {/* Footer */}
       <div className="sidebar-footer">
+        {/* Global Currency Selector */}
+        <div className="sidebar-currency-box">
+          <div className="sidebar-currency-label">
+            <span>🌐 Global Currency</span>
+            <span className="sidebar-currency-active-code">{globalCurrency}</span>
+          </div>
+          <select
+            className="sidebar-currency-select"
+            value={globalCurrency}
+            onChange={(e) => setGlobalCurrency(e.target.value)}
+            title="Change global currency across the whole project"
+          >
+            {CURRENCIES.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.code} — {c.symbol} ({c.name})
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="sidebar-rate-display">
           <div className="sidebar-rate-label">Reference Rate</div>
-          <div className="sidebar-rate-value">${referenceRate}</div>
-          <div className="sidebar-rate-sub">USD / troy oz</div>
+          <div
+            className="sidebar-rate-value"
+            title={formatCurrency(convertedRate, globalCurrency)}
+          >
+            {formatCurrency(convertedRate, globalCurrency)}
+          </div>
+          <div className="sidebar-rate-sub">{globalCurrency} / troy oz</div>
         </div>
 
         <button

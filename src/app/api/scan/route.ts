@@ -26,7 +26,7 @@ Expected JSON Structure:
       "type": "buy" or "sell",
       "weight": <number>,
       "weightUnit": "gram" or "tola" or "troy_oz",
-      "purity": "24K" or "22K" or "21K" or "18K" or "14K" or "custom" or null,
+      "purity": "24K 999" or "24K 995" or "24K 991" or null,
       "customPurity": null,
       "goldPricePerUnit": <number or null>,
       "currency": "<3-letter ISO code e.g. USD, INR, AED, SAR or null>",
@@ -44,7 +44,7 @@ Extraction Rules:
 2. SINGLE BILL: If the image represents a single bill or invoice, return a "transactions" array with that single transaction object.
 3. TYPE: "SELL", "sale", "out", "-" -> "sell"; "BUY", "purchase", "in", "+" -> "buy".
 4. WEIGHT & UNIT: Extract numeric weight and unit ("gram", "tola", "troy_oz"). E.g. "10g" -> weight: 10, weightUnit: "gram".
-5. PURITY: 999/999.9 -> "24K", 916 -> "22K", 875 -> "21K", 750 -> "18K", 583/585 -> "14K". If not visible, set purity to null and add "purity" to lowConfidenceFields.
+5. PURITY: Must be one of "24K 999", "24K 995", "24K 991". If purity mentions 995/99.5% -> "24K 995", 991/99.1% -> "24K 991", else default to "24K 999".
 6. Return ONLY the raw JSON object, nothing else.`;
 
 // ─── JSON Extraction Helper ───────────────────────────────────────────────────
@@ -266,9 +266,16 @@ export async function POST(req: Request) {
     else if (unitStr.includes('oz') || unitStr.includes('ounce')) weightUnit = 'troy_oz';
 
     // Purity
-    const purity = item.purity || '22K';
-    if (!item.purity) {
+    let purity = item.purity ? String(item.purity).trim() : '';
+    if (!purity) {
+      purity = '24K 999';
       if (!lowConf.includes('purity')) lowConf.push('purity');
+    } else if (purity.includes('995')) {
+      purity = '24K 995';
+    } else if (purity.includes('991')) {
+      purity = '24K 991';
+    } else {
+      purity = '24K 999';
     }
 
     // Price Per Unit (defaults to 2355 if not detected)
