@@ -3295,9 +3295,15 @@ body {
 /* Stats Grid */
 .mt-stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
   margin-bottom: 20px;
+}
+
+@media (min-width: 1200px) {
+  .mt-stats-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
 }
 
 .mt-stat-card {
@@ -3322,6 +3328,11 @@ body {
 
 .mt-stat-card.highlight {
   border-top-color: var(--gold-600);
+  background: #ffffff;
+}
+
+.mt-stat-card.balance {
+  border-top-color: #0284c7;
   background: #ffffff;
 }
 

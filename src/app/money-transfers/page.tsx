@@ -268,6 +268,26 @@ export default function MoneyTransfersPage() {
     const sendCount = filtered.filter(t => (t.transferType || (!t.senderName && t.receiverName ? 'send' : 'both')) === 'send').length;
     const pending = filtered.filter(t => t.status === 'pending').length;
     const completed = filtered.filter(t => t.status === 'completed').length;
+
+    // Calculate Remaining Transfer Amount (Amount received to transfer minus Amount sent, excluding profit/fees)
+    let totalReceived = 0;
+    let totalSent = 0;
+    filtered.forEach((t) => {
+      if (statusFilter !== 'cancelled' && t.status === 'cancelled') return;
+      const itemType: TransferType = t.transferType || (t.senderName && !t.receiverName ? 'receive' : !t.senderName && t.receiverName ? 'send' : 'both');
+      const amt = convertCurrency(t.amount, t.currency, globalCurrency);
+
+      if (itemType === 'receive') {
+        totalReceived += amt;
+      } else if (itemType === 'send') {
+        totalSent += amt;
+      } else {
+        totalReceived += amt;
+        totalSent += amt;
+      }
+    });
+    const remainingAmount = totalReceived - totalSent;
+
     return {
       total,
       totalAmount,
@@ -279,8 +299,11 @@ export default function MoneyTransfersPage() {
       sendCount,
       pending,
       completed,
+      totalReceived,
+      totalSent,
+      remainingAmount,
     };
-  }, [filtered, globalCurrency]);
+  }, [filtered, globalCurrency, statusFilter]);
 
   const SortIcon = ({ k }: { k: SortKey }) =>
     sortKey === k ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ' ↕';
@@ -363,6 +386,22 @@ export default function MoneyTransfersPage() {
 
       {/* ── Stats Cards ── */}
       <div className="mt-stats-grid">
+        <div className="mt-stat-card balance">
+          <div className="mt-stat-icon">💵</div>
+          <div className="mt-stat-content">
+            <span className="mt-stat-label">Total Amount</span>
+            <span
+              className="mt-stat-value"
+              style={{ color: stats.remainingAmount >= 0 ? '#0284c7' : '#dc2626' }}
+              title={`Received: ${formatCurrency(stats.totalReceived, globalCurrency)} · Sent: ${formatCurrency(stats.totalSent, globalCurrency)}`}
+            >
+              {stats.remainingAmount >= 0 ? '' : '−'}{formatCurrency(Math.abs(stats.remainingAmount), globalCurrency)}
+            </span>
+            <span className="mt-stat-sub">
+              Remaining balance
+            </span>
+          </div>
+        </div>
         <div className="mt-stat-card">
           <div className="mt-stat-icon">💰</div>
           <div className="mt-stat-content">
