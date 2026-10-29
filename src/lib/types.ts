@@ -48,20 +48,22 @@ export interface GoldRateSettings {
   lastUpdated: string;          // ISO string
 }
 
+export type TransferType = 'receive' | 'send' | 'both';
 export type MoneyTransferStatus = 'completed' | 'pending' | 'cancelled';
 
 export interface MoneyTransfer {
   id: string;
+  transferType?: TransferType;  // 'receive' (sender gives money) | 'send' (we give receiver money) | 'both'
   senderName: string;
   receiverName: string;
-  amount: number;               // original amount from sender
+  amount: number;               // original amount
   currency: string;             // currency of the transfer
   senderFeePercent: number;     // default 0.1 (%)
   receiverFeePercent: number;   // default 0.05 (%)
   senderFee: number;            // amount × senderFeePercent / 100
   receiverFee: number;          // amount × receiverFeePercent / 100
-  netProfit: number;            // senderFee − receiverFee
-  amountDelivered: number;      // amount − senderFee − receiverFee
+  netProfit: number;            // net profit / earning
+  amountDelivered: number;      // net amount delivered or credited
   paymentType: PaymentType;
   transactionId?: string;       // RTGS reference
   dateTime: string;             // ISO string

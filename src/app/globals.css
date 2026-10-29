@@ -3289,7 +3289,7 @@ body {
 
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   MONEY TRANSFER
+   GOLD TRANSFER
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* Stats Grid */
@@ -3368,6 +3368,93 @@ body {
   font-size: 11.5px;
   color: var(--text-muted);
   font-weight: 500;
+}
+
+/* Transfer Type / Direction Badge */
+.mt-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.mt-type-badge.receive {
+  background: rgba(21, 128, 61, 0.1);
+  color: #15803d;
+  border: 1px solid rgba(21, 128, 61, 0.2);
+}
+
+.mt-type-badge.send {
+  background: rgba(217, 119, 6, 0.1);
+  color: #b45309;
+  border: 1px solid rgba(217, 119, 6, 0.2);
+}
+
+.mt-type-badge.both {
+  background: rgba(3, 105, 161, 0.1);
+  color: #0369a1;
+  border: 1px solid rgba(3, 105, 161, 0.2);
+}
+
+/* Mode Selector in Modal */
+.mt-mode-selector {
+  display: flex;
+  background: var(--bg-muted, #f3f4f8);
+  padding: 4px;
+  border-radius: var(--radius-md, 4px);
+  border: 1px solid var(--border);
+  gap: 4px;
+  margin-bottom: 18px;
+}
+
+.mt-mode-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm, 3px);
+  cursor: pointer;
+  transition: all var(--transition);
+  user-select: none;
+}
+
+.mt-mode-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.mt-mode-btn.active {
+  background: #ffffff;
+  color: var(--text-primary);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.mt-mode-btn.active.receive {
+  color: #15803d;
+  border-bottom: 2px solid #15803d;
+}
+
+.mt-mode-btn.active.send {
+  color: #b45309;
+  border-bottom: 2px solid #b45309;
+}
+
+.mt-mode-btn.active.both {
+  color: #0369a1;
+  border-bottom: 2px solid #0369a1;
 }
 
 /* Party cells in table */

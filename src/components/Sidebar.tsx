@@ -11,7 +11,7 @@ import { formatCurrency } from '@/lib/formatters';
 const navItems = [
   { href: '/',               icon: '📊', label: 'Dashboard' },
   { href: '/transactions',   icon: '📋', label: 'Transaction Log' },
-  { href: '/money-transfers', icon: '💸', label: 'Money Transfer' },
+  { href: '/money-transfers', icon: '💸', label: 'Gold Transfer' },
   { href: '/counterparties', icon: '👥', label: 'Buyers & Sellers' },
   { href: '/scan',           icon: '🤖', label: 'AI Scan' },
   { href: '/settings',       icon: '⚙️',  label: 'Gold Rate Settings' },

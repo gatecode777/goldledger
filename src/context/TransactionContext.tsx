@@ -278,14 +278,14 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
     return (data.count as number) || txs.length;
   }, [fetchAll, saveOrUpdateCounterparty]);
 
-  // ── Money Transfers ─────────────────────────────────────────────────────────
+  // ── Gold Transfers ──────────────────────────────────────────────────────────
   const addMoneyTransfer = useCallback(async (mt: Omit<MoneyTransfer, 'id'>) => {
     const res = await fetch('/api/money-transfers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(mt),
     });
-    if (!res.ok) throw new Error('Failed to create money transfer');
+    if (!res.ok) throw new Error('Failed to create gold transfer');
     const created: MoneyTransfer = await res.json();
     setMoneyTransfers((prev) => [created, ...prev]);
   }, []);
@@ -296,14 +296,14 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(mt),
     });
-    if (!res.ok) throw new Error('Failed to update money transfer');
+    if (!res.ok) throw new Error('Failed to update gold transfer');
     const updated: MoneyTransfer = await res.json();
     setMoneyTransfers((prev) => prev.map((t) => (t.id === id ? updated : t)));
   }, []);
 
   const deleteMoneyTransfer = useCallback(async (id: string) => {
     const res = await fetch(`/api/money-transfers/${id}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error('Failed to delete money transfer');
+    if (!res.ok) throw new Error('Failed to delete gold transfer');
     setMoneyTransfers((prev) => prev.filter((t) => t.id !== id));
   }, []);
 

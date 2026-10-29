@@ -24,7 +24,7 @@ export async function GET() {
     return NextResponse.json(serialized);
   } catch (err) {
     console.error('[GET /api/money-transfers]', err);
-    return NextResponse.json({ error: 'Failed to fetch money transfers' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch gold transfers' }, { status: 500 });
   }
 }
 
@@ -41,7 +41,7 @@ export async function POST(req: Request) {
     return NextResponse.json(serialized, { status: 201 });
   } catch (err) {
     console.error('[POST /api/money-transfers]', err);
-    return NextResponse.json({ error: 'Failed to create money transfer' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to create gold transfer' }, { status: 500 });
   }
 }
 
