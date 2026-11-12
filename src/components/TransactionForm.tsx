@@ -8,6 +8,7 @@ import { useTransactions } from '@/context/TransactionContext';
 import { useToast } from '@/components/Toast';
 import { formatCurrency, weightToGrams } from '@/lib/formatters';
 import CounterpartySelect from '@/components/CounterpartySelect';
+import { IconZap, IconPlus, IconLedger, IconBanknote, IconLandmark, IconCheck } from '@/components/Icons';
 
 interface TransactionFormProps {
   initialValues?: Partial<Transaction>;
@@ -349,7 +350,7 @@ export default function TransactionForm({
                 onClick={handleNewSimilar}
                 autoFocus
               >
-                ⚡ New Similar
+                <IconZap size={14} /> New Similar
                 <span style={{ fontSize: 11, opacity: 0.75, marginLeft: 4 }}>
                   (same {successPayload.purity}, {successPayload.currency})
                 </span>
@@ -359,14 +360,14 @@ export default function TransactionForm({
                 className="btn btn-lg btn-secondary"
                 onClick={handleNewTransaction}
               >
-                ✚ New Transaction
+                <IconPlus size={14} /> New Transaction
               </button>
               <button
                 type="button"
                 className="btn btn-lg btn-ghost"
                 onClick={() => router.push('/transactions')}
               >
-                📋 View Ledger
+                <IconLedger size={14} /> View Ledger
               </button>
             </div>
           </div>
@@ -450,7 +451,7 @@ export default function TransactionForm({
                       onClick={() => setPaymentType('Cash')}
                       tabIndex={-1}
                     >
-                      💵 Cash
+                      <IconBanknote size={14} /> Cash
                     </button>
                     <button
                       type="button"
@@ -458,7 +459,7 @@ export default function TransactionForm({
                       onClick={() => setPaymentType('RTGS')}
                       tabIndex={-1}
                     >
-                      🏦 RTGS
+                      <IconLandmark size={14} /> RTGS
                     </button>
                   </div>
                 </div>
@@ -704,7 +705,7 @@ export default function TransactionForm({
               tabIndex={9}
             >
               {submitting
-                ? '⏳ Saving…'
+                ? 'Saving…'
                 : (
                   <>
                     {type === 'buy' ? '▲ Record BUY' : '▼ Record SELL'}
@@ -819,14 +820,14 @@ export default function TransactionForm({
               className={`payment-tab ${paymentType === 'Cash' ? 'active' : ''}`}
               onClick={() => setPaymentType('Cash')}
             >
-              💵 Cash
+              <IconBanknote size={14} /> Cash
             </button>
             <button
               type="button"
               className={`payment-tab ${paymentType === 'RTGS' ? 'active' : ''}`}
               onClick={() => setPaymentType('RTGS')}
             >
-              🏦 RTGS
+              <IconLandmark size={14} /> RTGS
             </button>
           </div>
         </div>
@@ -936,7 +937,7 @@ export default function TransactionForm({
             <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               Estimated Total Value
             </div>
-            <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 24, fontWeight: 700, color: '#b45309', marginTop: 4 }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontVariantNumeric: 'tabular-nums', fontSize: 24, fontWeight: 700, color: '#b45309', marginTop: 4 }}>
               {currencyInfo?.symbol ?? currency} {totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </div>
           </div>
@@ -955,7 +956,7 @@ export default function TransactionForm({
           </button>
         )}
         <button type="submit" className="btn btn-primary btn-lg" disabled={submitting}>
-          {submitting ? '⏳ Saving…' : editId ? '✅ Update Transaction' : '✅ Record Transaction'}
+          {submitting ? 'Saving…' : editId ? <><IconCheck size={14} /> Update Transaction</> : <><IconCheck size={14} /> Record Transaction</>}
         </button>
       </div>
     </form>

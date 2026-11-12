@@ -16,15 +16,18 @@ interface TransactionContextValue {
   addTransaction: (tx: Omit<Transaction, 'id'>) => Promise<void>;
   updateTransaction: (id: string, tx: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
+  deleteTransactions: (ids: string[]) => Promise<void>;
   updateRateSettings: (settings: GoldRateSettings) => Promise<void>;
   importTransactions: (txs: Omit<Transaction, 'id'>[]) => Promise<number>;
   saveOrUpdateCounterparty: (name: string, type: 'buyer' | 'seller', price: number, currency: string, weightUnit?: WeightUnit) => Promise<void>;
   addCounterparty: (c: Omit<Counterparty, 'id'>) => Promise<Counterparty>;
   updateCounterparty: (id: string, c: Partial<Counterparty>) => Promise<void>;
   deleteCounterparty: (id: string) => Promise<void>;
+  deleteCounterparties: (ids: string[]) => Promise<void>;
   addMoneyTransfer: (mt: Omit<MoneyTransfer, 'id'>) => Promise<void>;
   updateMoneyTransfer: (id: string, mt: Partial<MoneyTransfer>) => Promise<void>;
   deleteMoneyTransfer: (id: string) => Promise<void>;
+  deleteMoneyTransfers: (ids: string[]) => Promise<void>;
   refetch: () => Promise<void>;
 }
 
@@ -185,6 +188,18 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
     setCounterparties((prev) => prev.filter((p) => p.id !== id));
   }, []);
 
+  const deleteCounterparties = useCallback(async (ids: string[]) => {
+    if (!ids || ids.length === 0) return;
+    const res = await fetch('/api/counterparties', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    });
+    if (!res.ok) throw new Error('Failed to delete counterparties');
+    const set = new Set(ids);
+    setCounterparties((prev) => prev.filter((p) => !set.has(p.id)));
+  }, []);
+
   // ── Transactions ────────────────────────────────────────────────────────────
   const addTransaction = useCallback(async (tx: Omit<Transaction, 'id'>) => {
     const res = await fetch('/api/transactions', {
@@ -233,6 +248,18 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
     const res = await fetch(`/api/transactions/${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed to delete transaction');
     setTransactions((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const deleteTransactions = useCallback(async (ids: string[]) => {
+    if (!ids || ids.length === 0) return;
+    const res = await fetch('/api/transactions', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    });
+    if (!res.ok) throw new Error('Failed to delete transactions');
+    const set = new Set(ids);
+    setTransactions((prev) => prev.filter((t) => !set.has(t.id)));
   }, []);
 
   const updateRateSettings = useCallback(async (settings: GoldRateSettings) => {
@@ -307,6 +334,18 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
     setMoneyTransfers((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
+  const deleteMoneyTransfers = useCallback(async (ids: string[]) => {
+    if (!ids || ids.length === 0) return;
+    const res = await fetch('/api/money-transfers', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    });
+    if (!res.ok) throw new Error('Failed to delete gold transfers');
+    const set = new Set(ids);
+    setMoneyTransfers((prev) => prev.filter((t) => !set.has(t.id)));
+  }, []);
+
   const value = useMemo<TransactionContextValue>(() => ({
     transactions,
     rateSettings,
@@ -319,21 +358,24 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
     addTransaction,
     updateTransaction,
     deleteTransaction,
+    deleteTransactions,
     updateRateSettings,
     importTransactions,
     saveOrUpdateCounterparty,
     addCounterparty,
     updateCounterparty,
     deleteCounterparty,
+    deleteCounterparties,
     addMoneyTransfer,
     updateMoneyTransfer,
     deleteMoneyTransfer,
+    deleteMoneyTransfers,
     refetch: fetchAll,
   }), [
     transactions, rateSettings, counterparties, moneyTransfers, globalCurrency, setGlobalCurrency, loading, error,
-    addTransaction, updateTransaction, deleteTransaction, updateRateSettings, importTransactions,
-    saveOrUpdateCounterparty, addCounterparty, updateCounterparty, deleteCounterparty,
-    addMoneyTransfer, updateMoneyTransfer, deleteMoneyTransfer, fetchAll,
+    addTransaction, updateTransaction, deleteTransaction, deleteTransactions, updateRateSettings, importTransactions,
+    saveOrUpdateCounterparty, addCounterparty, updateCounterparty, deleteCounterparty, deleteCounterparties,
+    addMoneyTransfer, updateMoneyTransfer, deleteMoneyTransfer, deleteMoneyTransfers, fetchAll,
   ]);
 
   return (

@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Counterparty, TransactionType } from '@/lib/types';
 import { formatCurrency } from '@/lib/formatters';
+import { IconZap } from '@/components/Icons';
 
 interface CounterpartySelectProps {
   value: string;
@@ -159,7 +160,9 @@ export default function CounterpartySelect({
           gap: 5,
           fontWeight: 500,
         }}>
-          <span>⚡ Saved profile:</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <IconZap size={12} /> Saved profile:
+          </span>
           <strong>{selectedParty.name}</strong>
           <span>({formatCurrency(selectedParty.defaultPrice, selectedParty.currency)} / {selectedParty.weightUnit || 'g'})</span>
         </div>

@@ -5,6 +5,7 @@ import { parseExcelTransactions, downloadSampleExcelTemplate, ParseSummary } fro
 import { useToast } from '@/components/Toast';
 import { useTransactions } from '@/context/TransactionContext';
 import { formatCurrency, formatDate, purityLabel } from '@/lib/formatters';
+import { IconUpload, IconX, IconFile, IconAlert, IconRefresh, IconCheck, IconTrendingUp, IconTrendingDown, IconZap } from '@/components/Icons';
 
 interface ExcelImportModalProps {
   isOpen: boolean;
@@ -122,16 +123,15 @@ export default function ExcelImportModal({
             <div style={{
               width: 38,
               height: 38,
-              borderRadius: 10,
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              borderRadius: 0,
+              background: '#fef3c7',
+              border: '1px solid #fde68a',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 18,
-              color: '#fff',
-              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+              color: '#b45309',
             }}>
-              📊
+              <IconUpload size={18} />
             </div>
             <div>
               <div className="modal-title" style={{ fontSize: 18, fontWeight: 700 }}>
@@ -162,7 +162,7 @@ export default function ExcelImportModal({
               disabled={importing}
               style={{ fontSize: 16 }}
             >
-              ✕
+              <IconX size={16} />
             </button>
           </div>
         </div>
@@ -191,9 +191,9 @@ export default function ExcelImportModal({
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
               >
-                <div style={{ fontSize: 48, marginBottom: 10 }}>📁</div>
+                <div style={{ marginBottom: 12, color: '#b45309', display: 'flex', justifyContent: 'center' }}><IconUpload size={34} /></div>
                 <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
-                  Drag & Drop Excel file here, or <span style={{ color: 'var(--gold-primary)', textDecoration: 'underline' }}>browse</span>
+                  Drag &amp; Drop Excel file here, or <span style={{ color: 'var(--gold-primary)', textDecoration: 'underline' }}>browse</span>
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>
                   Supports .xlsx, .xls, and .csv formats
@@ -204,13 +204,13 @@ export default function ExcelImportModal({
                   alignItems: 'center',
                   gap: 8,
                   padding: '6px 14px',
-                  borderRadius: 20,
+                  borderRadius: 0,
                   background: 'var(--bg-muted)',
                   fontSize: 12,
                   color: 'var(--text-secondary)',
                   border: '1px solid var(--border)',
                 }}>
-                  💡 Tip: Download our <strong>Sample Template</strong> above for guaranteed format accuracy.
+                  <IconZap size={13} style={{ color: '#b45309' }} /> Tip: Download our <strong>Sample Template</strong> above for guaranteed format accuracy.
                 </div>
               </div>
 
@@ -218,7 +218,7 @@ export default function ExcelImportModal({
                 <div style={{
                   marginTop: 16,
                   padding: '12px 16px',
-                  borderRadius: 10,
+                  borderRadius: 0,
                   background: 'rgba(239, 68, 68, 0.08)',
                   border: '1px solid rgba(239, 68, 68, 0.3)',
                   color: '#dc2626',
@@ -227,7 +227,7 @@ export default function ExcelImportModal({
                   alignItems: 'center',
                   gap: 8,
                 }}>
-                  ⚠️ {parseError}
+                  <IconAlert size={15} /> {parseError}
                 </div>
               )}
             </div>
@@ -256,12 +256,12 @@ export default function ExcelImportModal({
                 justifyContent: 'space-between',
                 padding: '12px 16px',
                 background: 'var(--bg-muted)',
-                borderRadius: 10,
+                borderRadius: 0,
                 border: '1px solid var(--border)',
                 marginBottom: 16,
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 20 }}>📄</span>
+                  <IconFile size={20} style={{ color: '#b45309' }} />
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
                       {selectedFile?.name}
@@ -278,7 +278,7 @@ export default function ExcelImportModal({
                   onClick={handleReset}
                   style={{ fontSize: 12, color: 'var(--text-muted)' }}
                 >
-                  🔄 Choose different file
+                  <IconRefresh size={13} /> Choose different file
                 </button>
               </div>
 
@@ -292,13 +292,13 @@ export default function ExcelImportModal({
                 <div style={{
                   padding: '12px 16px',
                   background: 'var(--bg-card)',
-                  borderRadius: 10,
+                  borderRadius: 0,
                   border: '1px solid var(--border)',
                 }}>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Total Parsed
                   </div>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', marginTop: 2 }}>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
                     {summary.totalRows}
                   </div>
                 </div>
@@ -306,13 +306,13 @@ export default function ExcelImportModal({
                 <div style={{
                   padding: '12px 16px',
                   background: 'rgba(16, 185, 129, 0.08)',
-                  borderRadius: 10,
+                  borderRadius: 0,
                   border: '1px solid rgba(16, 185, 129, 0.25)',
                 }}>
                   <div style={{ fontSize: 11, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
                     Ready to Import
                   </div>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: '#059669', marginTop: 2 }}>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: '#059669', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
                     {summary.validCount}
                   </div>
                 </div>
@@ -320,13 +320,13 @@ export default function ExcelImportModal({
                 <div style={{
                   padding: '12px 16px',
                   background: summary.errorCount > 0 ? 'rgba(239, 68, 68, 0.08)' : 'var(--bg-card)',
-                  borderRadius: 10,
+                  borderRadius: 0,
                   border: summary.errorCount > 0 ? '1px solid rgba(239, 68, 68, 0.25)' : '1px solid var(--border)',
                 }}>
                   <div style={{ fontSize: 11, color: summary.errorCount > 0 ? '#dc2626' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
                     Errors / Skipped
                   </div>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: summary.errorCount > 0 ? '#dc2626' : 'var(--text-secondary)', marginTop: 2 }}>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: summary.errorCount > 0 ? '#dc2626' : 'var(--text-secondary)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
                     {summary.errorCount}
                   </div>
                 </div>
@@ -348,7 +348,7 @@ export default function ExcelImportModal({
                   onClick={() => setFilterTab('valid')}
                   style={{ fontSize: 12, padding: '5px 12px' }}
                 >
-                  ✅ Valid ({summary.validCount})
+                  <IconCheck size={12} /> Valid ({summary.validCount})
                 </button>
                 {summary.errorCount > 0 && (
                   <button
@@ -357,7 +357,7 @@ export default function ExcelImportModal({
                     onClick={() => setFilterTab('error')}
                     style={{ fontSize: 12, padding: '5px 12px' }}
                   >
-                    ⚠️ Errors ({summary.errorCount})
+                    <IconAlert size={12} /> Errors ({summary.errorCount})
                   </button>
                 )}
               </div>
@@ -401,7 +401,7 @@ export default function ExcelImportModal({
                           <td>
                             {tx ? (
                               <span className={`tx-badge ${tx.type}`} style={{ fontSize: 10, padding: '2px 6px' }}>
-                                {tx.type === 'buy' ? '📈 BUY' : '📉 SELL'}
+                                {tx.type === 'buy' ? <><IconTrendingUp size={11} /> BUY</> : <><IconTrendingDown size={11} /> SELL</>}
                               </span>
                             ) : (
                               String(r.raw.type || r.raw.Type || '—')
@@ -474,10 +474,6 @@ export default function ExcelImportModal({
                 className="btn btn-primary"
                 onClick={handleConfirmImport}
                 disabled={importing || summary.validCount === 0}
-                style={{
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
-                }}
               >
                 {importing ? (
                   <>
@@ -485,7 +481,7 @@ export default function ExcelImportModal({
                     Importing…
                   </>
                 ) : (
-                  `📥 Import ${summary.validCount} Transactions`
+                  <><IconUpload size={14} /> Import {summary.validCount} Transactions</>
                 )}
               </button>
             )}

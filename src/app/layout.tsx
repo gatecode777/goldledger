@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter, Outfit } from 'next/font/google';
+import { Manrope, DM_Sans } from 'next/font/google';
 import './globals.css';
 import { TransactionProvider } from '@/context/TransactionContext';
 import { ToastProvider } from '@/components/Toast';
@@ -8,18 +8,16 @@ import { SessionProvider } from 'next-auth/react';
 import { auth } from '@/auth';
 
 // Self-hosted via next/font — eliminates render-blocking Google Fonts request.
-// Fonts are preloaded in <head>, served from the same origin, font-display: swap.
-const inter = Inter({
+// Manrope for crisp display headings & financial figures; DM Sans for readable UI & tables.
+const manrope = Manrope({
   subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700', '800'],
-  variable: '--font-inter',
+  variable: '--font-manrope',
   display: 'swap',
 });
 
-const outfit = Outfit({
+const dmSans = DM_Sans({
   subsets: ['latin'],
-  weight: ['400', '600', '700', '800'],
-  variable: '--font-outfit',
+  variable: '--font-dm-sans',
   display: 'swap',
 });
 
@@ -34,7 +32,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const isLoggedIn = !!session;
 
   return (
-    <html lang="en" className={`${inter.variable} ${outfit.variable}`}>
+    <html lang="en" className={`${manrope.variable} ${dmSans.variable}`}>
       <body>
         <SessionProvider session={session}>
           <ToastProvider>

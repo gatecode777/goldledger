@@ -47,3 +47,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Failed to create transaction' }, { status: 500 });
   }
 }
+
+// DELETE /api/transactions — bulk delete transactions
+export async function DELETE(req: Request) {
+  const session = await auth();
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  try {
+    const body = await req.json();
+    const ids: string[] = Array.isArray(body.ids) ? body.ids : body.id ? [body.id] : [];
+    if (!ids.length) {
+      return NextResponse.json({ error: 'No IDs provided' }, { status: 400 });
+    }
+    await connectDB();
+    await TransactionModel.deleteMany({ _id: { $in: ids } });
+    return NextResponse.json({ success: true, count: ids.length });
+  } catch (err) {
+    console.error('[DELETE /api/transactions]', err);
+    return NextResponse.json({ error: 'Failed to delete transactions' }, { status: 500 });
+  }
+}

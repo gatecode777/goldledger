@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { IconGoldBar, IconAlert, IconMail, IconLock, IconEye, IconEyeOff } from '@/components/Icons';
 
 interface Props {
   action: (formData: FormData) => Promise<void>;
@@ -42,7 +43,7 @@ function LoginFormInner({ action, error: errorProp }: Props) {
       <div className="login-card">
         {/* Logo */}
         <div className="login-logo">
-          <div className="login-logo-icon"><span>🥇</span></div>
+          <div className="login-logo-icon"><IconGoldBar size={22} /></div>
           <div className="login-logo-text">
             <span className="login-logo-name">GoldLedger</span>
             <span className="login-logo-sub">Admin Portal</span>
@@ -56,7 +57,7 @@ function LoginFormInner({ action, error: errorProp }: Props) {
 
         {hasError && (
           <div className="login-error">
-            <span>⚠️</span>
+            <IconAlert size={16} />
             <span>Invalid credentials. Please try again.</span>
           </div>
         )}
@@ -65,7 +66,7 @@ function LoginFormInner({ action, error: errorProp }: Props) {
           <div className="login-field">
             <label className="login-label" htmlFor="login-email">Email Address</label>
             <div className="login-input-wrap">
-              <span className="login-input-icon">✉️</span>
+              <span className="login-input-icon"><IconMail size={16} /></span>
               <input
                 id="login-email"
                 name="email"
@@ -82,7 +83,7 @@ function LoginFormInner({ action, error: errorProp }: Props) {
           <div className="login-field">
             <label className="login-label" htmlFor="login-password">Password</label>
             <div className="login-input-wrap">
-              <span className="login-input-icon">🔑</span>
+              <span className="login-input-icon"><IconLock size={16} /></span>
               <input
                 id="login-password"
                 name="password"
@@ -97,8 +98,9 @@ function LoginFormInner({ action, error: errorProp }: Props) {
                 className="login-eye-btn"
                 onClick={() => setShowPass((p) => !p)}
                 tabIndex={-1}
+                aria-label={showPass ? 'Hide password' : 'Show password'}
               >
-                {showPass ? '🙈' : '👁️'}
+                {showPass ? <IconEyeOff size={16} /> : <IconEye size={16} />}
               </button>
             </div>
           </div>
@@ -115,7 +117,7 @@ function LoginFormInner({ action, error: errorProp }: Props) {
               </>
             ) : (
               <>
-                <span>🔐</span>
+                <IconLock size={15} />
                 Sign In to GoldLedger
               </>
             )}
@@ -123,7 +125,9 @@ function LoginFormInner({ action, error: errorProp }: Props) {
         </form>
 
         <p className="login-footer-note">
-          🔒 Secured with end-to-end encrypted sessions
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <IconLock size={12} /> Secured with end-to-end encrypted sessions
+          </span>
         </p>
       </div>
     </div>

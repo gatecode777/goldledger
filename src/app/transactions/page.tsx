@@ -14,8 +14,25 @@ import {
   calculateTransactionPnL,
   calculateCounterpartySummary,
   calculateAllCounterpartiesBreakdown,
-  CounterpartyPnLSummary,
 } from '@/lib/pnl';
+import {
+  IconPlus,
+  IconSearch,
+  IconX,
+  IconArrowDownLeft,
+  IconArrowUpRight,
+  IconLandmark,
+  IconBanknote,
+  IconScan,
+  IconUpload,
+  IconDownload,
+  IconEdit,
+  IconTrash,
+  IconBarChart,
+  IconUsers,
+  IconAlert,
+  IconLedger,
+} from '@/components/Icons';
 
 const PURITY_OPTIONS: Purity[] = ['24K 999', '24K 995', '24K 991'];
 
@@ -26,6 +43,7 @@ export default function TransactionsPage() {
     transactions,
     counterparties,
     deleteTransaction,
+    deleteTransactions,
     loading,
     error,
     refetch,
@@ -36,15 +54,20 @@ export default function TransactionsPage() {
   const { showToast } = useToast();
 
   // Filters
-  const [search,      setSearch]      = useState('');
-  const [typeFilter,  setTypeFilter]  = useState('all');
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
   const [partyFilter, setPartyFilter] = useState('all');
-  const [currFilter,  setCurrFilter]  = useState('all');
-  const [purFilter,   setPurFilter]   = useState('all');
-  const [payFilter,   setPayFilter]   = useState('all');
-  const [srcFilter,   setSrcFilter]   = useState('all');
-  const [dateFrom,    setDateFrom]    = useState('');
-  const [dateTo,      setDateTo]      = useState('');
+  const [currFilter, setCurrFilter] = useState('all');
+  const [purFilter, setPurFilter] = useState('all');
+  const [payFilter, setPayFilter] = useState('all');
+  const [srcFilter, setSrcFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  // Multiple selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
 
   // Counterparty Ranking Modal
   const [showRankingModal, setShowRankingModal] = useState(false);
@@ -64,14 +87,12 @@ export default function TransactionsPage() {
   }, []);
 
   // Sort
-  const [sortKey, setSortKey]   = useState<SortKey>('dateTime');
-  const [sortDir, setSortDir]   = useState<'asc' | 'desc'>('desc');
+  const [sortKey, setSortKey] = useState<SortKey>('dateTime');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
-  // Edit modal
-  const [editTx, setEditTx]       = useState<Transaction | null>(null);
-  // Delete confirm
-  const [deleteId, setDeleteId]   = useState<string | null>(null);
-  // Excel import modal
+  // Modals
+  const [editTx, setEditTx] = useState<Transaction | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
 
   function handleExportExcel(exportAll = false) {
@@ -81,16 +102,20 @@ export default function TransactionsPage() {
       return;
     }
     const dateStr = new Date().toISOString().slice(0, 10);
-    const filename = (exportAll || !hasFilters)
-      ? `gold_transactions_all_${dateStr}.xlsx`
-      : `gold_transactions_filtered_${dateStr}.xlsx`;
+    const filename =
+      exportAll || !hasFilters
+        ? `gold_transactions_all_${dateStr}.xlsx`
+        : `gold_transactions_filtered_${dateStr}.xlsx`;
     exportTransactionsToExcel(listToExport, filename);
     showToast(`Exported ${listToExport.length} transactions to Excel!`, 'success');
   }
 
   function handleSort(key: SortKey) {
-    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    else { setSortKey(key); setSortDir('desc'); }
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
   }
 
   async function confirmDelete(id: string) {
@@ -103,47 +128,56 @@ export default function TransactionsPage() {
     setDeleteId(null);
   }
 
-  const currencies = useMemo(() =>
-    Array.from(new Set(transactions.map(t => t.currency))).sort(),
-  [transactions]);
+  const currencies = useMemo(
+    () => Array.from(new Set(transactions.map((t) => t.currency))).sort(),
+    [transactions]
+  );
 
   const counterpartyOptions = useMemo(() => {
     const set = new Set<string>();
-    transactions.forEach(t => {
+    transactions.forEach((t) => {
       const name = (t.counterparty || '').trim();
       if (name) set.add(name);
     });
-    counterparties.forEach(c => {
+    counterparties.forEach((c) => {
       const name = (c.name || '').trim();
       if (name) set.add(name);
     });
 
-    return Array.from(set).sort().map(name => {
-      const foundParty = counterparties.find(c => c.name.toLowerCase() === name.toLowerCase());
-      let role = foundParty ? foundParty.type : '';
-      if (!role) {
-        const partyTxs = transactions.filter(t => (t.counterparty || '').trim().toLowerCase() === name.toLowerCase());
-        const hasBuy = partyTxs.some(t => t.type === 'buy');
-        const hasSell = partyTxs.some(t => t.type === 'sell');
-        if (hasBuy && hasSell) role = 'both';
-        else if (hasBuy) role = 'buyer';
-        else if (hasSell) role = 'seller';
-      }
-      return { name, role };
-    });
+    return Array.from(set)
+      .sort()
+      .map((name) => {
+        const foundParty = counterparties.find((c) => c.name.toLowerCase() === name.toLowerCase());
+        let role = foundParty ? foundParty.type : '';
+        if (!role) {
+          const partyTxs = transactions.filter(
+            (t) => (t.counterparty || '').trim().toLowerCase() === name.toLowerCase()
+          );
+          const hasBuy = partyTxs.some((t) => t.type === 'buy');
+          const hasSell = partyTxs.some((t) => t.type === 'sell');
+          if (hasBuy && hasSell) role = 'both';
+          else if (hasBuy) role = 'buyer';
+          else if (hasSell) role = 'seller';
+        }
+        return { name, role };
+      });
   }, [transactions, counterparties]);
 
   const filtered = useMemo(() => {
     return transactions
-      .filter(t => {
+      .filter((t) => {
         if (typeFilter !== 'all' && t.type !== typeFilter) return false;
-        if (partyFilter !== 'all' && (t.counterparty || '').trim().toLowerCase() !== partyFilter.trim().toLowerCase()) return false;
+        if (
+          partyFilter !== 'all' &&
+          (t.counterparty || '').trim().toLowerCase() !== partyFilter.trim().toLowerCase()
+        )
+          return false;
         if (currFilter !== 'all' && t.currency !== currFilter) return false;
-        if (purFilter  !== 'all' && purityLabel(t.purity, t.customPurity) !== purFilter) return false;
-        if (payFilter  !== 'all' && (t.paymentType || 'Cash') !== payFilter) return false;
-        if (srcFilter  !== 'all' && t.source !== srcFilter) return false;
+        if (purFilter !== 'all' && purityLabel(t.purity, t.customPurity) !== purFilter) return false;
+        if (payFilter !== 'all' && (t.paymentType || 'Cash') !== payFilter) return false;
+        if (srcFilter !== 'all' && t.source !== srcFilter) return false;
         if (dateFrom && t.dateTime < dateFrom) return false;
-        if (dateTo   && t.dateTime > dateTo + 'T23:59:59') return false;
+        if (dateTo && t.dateTime > dateTo + 'T23:59:59') return false;
         if (search) {
           const q = search.toLowerCase();
           return (
@@ -159,11 +193,11 @@ export default function TransactionsPage() {
       })
       .sort((a, b) => {
         let cmp = 0;
-        if (sortKey === 'dateTime')   cmp = a.dateTime.localeCompare(b.dateTime);
-        if (sortKey === 'type')       cmp = a.type.localeCompare(b.type);
+        if (sortKey === 'dateTime') cmp = a.dateTime.localeCompare(b.dateTime);
+        if (sortKey === 'type') cmp = a.type.localeCompare(b.type);
         if (sortKey === 'totalValue') cmp = a.totalValue - b.totalValue;
-        if (sortKey === 'purity')     cmp = a.purity.localeCompare(b.purity);
-        if (sortKey === 'currency')   cmp = a.currency.localeCompare(b.currency);
+        if (sortKey === 'purity') cmp = a.purity.localeCompare(b.purity);
+        if (sortKey === 'currency') cmp = a.currency.localeCompare(b.currency);
         if (sortKey === 'counterparty') cmp = (a.counterparty || '').localeCompare(b.counterparty || '');
         if (sortKey === 'pnl') {
           const pnlA = calculateTransactionPnL(a, globalCurrency).pnlGlobal;
@@ -175,8 +209,15 @@ export default function TransactionsPage() {
   }, [transactions, typeFilter, partyFilter, currFilter, purFilter, payFilter, srcFilter, dateFrom, dateTo, search, sortKey, sortDir, globalCurrency]);
 
   function clearFilters() {
-    setSearch(''); setTypeFilter('all'); setPartyFilter('all'); setCurrFilter('all');
-    setPurFilter('all'); setPayFilter('all'); setSrcFilter('all'); setDateFrom(''); setDateTo('');
+    setSearch('');
+    setTypeFilter('all');
+    setPartyFilter('all');
+    setCurrFilter('all');
+    setPurFilter('all');
+    setPayFilter('all');
+    setSrcFilter('all');
+    setDateFrom('');
+    setDateTo('');
   }
 
   const filteredTotalInGlobal = useMemo(() => {
@@ -195,8 +236,64 @@ export default function TransactionsPage() {
     return calculateAllCounterpartiesBreakdown(transactions, globalCurrency);
   }, [transactions, globalCurrency]);
 
-  const hasFilters = search || typeFilter !== 'all' || partyFilter !== 'all' || currFilter !== 'all' ||
-    purFilter !== 'all' || payFilter !== 'all' || srcFilter !== 'all' || dateFrom || dateTo;
+  const hasFilters =
+    search ||
+    typeFilter !== 'all' ||
+    partyFilter !== 'all' ||
+    currFilter !== 'all' ||
+    purFilter !== 'all' ||
+    payFilter !== 'all' ||
+    srcFilter !== 'all' ||
+    dateFrom ||
+    dateTo;
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const allVisibleSelected = filtered.length > 0 && filtered.every((tx) => selectedIds.has(tx.id));
+  const isIndeterminate = !allVisibleSelected && filtered.some((tx) => selectedIds.has(tx.id));
+
+  function toggleSelectAll() {
+    if (allVisibleSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        filtered.forEach((tx) => next.delete(tx.id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        filtered.forEach((tx) => next.add(tx.id));
+        return next;
+      });
+    }
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    setIsDeletingBulk(true);
+    try {
+      const idsArray = Array.from(selectedIds);
+      await deleteTransactions(idsArray);
+      showToast(`Deleted ${idsArray.length} transaction${idsArray.length !== 1 ? 's' : ''}`, 'success');
+      setSelectedIds(new Set());
+      setShowBulkDeleteModal(false);
+    } catch {
+      showToast('Failed to delete transactions', 'error');
+    } finally {
+      setIsDeletingBulk(false);
+    }
+  }
 
   const SortIcon = ({ k }: { k: SortKey }) =>
     sortKey === k ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ' ↕';
@@ -213,7 +310,9 @@ export default function TransactionsPage() {
   if (error) {
     return (
       <div className="page-error">
-        <div style={{ fontSize: 40 }}>⚠️</div>
+        <div className="page-error-icon">
+          <IconAlert size={32} />
+        </div>
         <h2>Connection Error</h2>
         <p>{error}</p>
       </div>
@@ -226,13 +325,15 @@ export default function TransactionsPage() {
         <div>
           <h1 className="page-title">Transaction Log</h1>
           <p className="page-subtitle">
-            {filtered.length} of {transactions.length} transactions · Filtered Total: <strong>{formatCurrency(filteredTotalInGlobal, globalCurrency)}</strong>
+            {filtered.length} of {transactions.length} transactions · Filtered Total{' '}
+            <strong>{formatCurrency(filteredTotalInGlobal, globalCurrency)}</strong>
           </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <div className="global-currency-badge" title="Change global display currency across entire project">
-            <label>Currency:</label>
+        <div className="page-header-actions">
+          <div className="global-currency-badge" title="Change global display currency">
+            <label htmlFor="tx-currency">Currency</label>
             <select
+              id="tx-currency"
               className="global-currency-select"
               value={globalCurrency}
               onChange={(e) => setGlobalCurrency(e.target.value)}
@@ -249,12 +350,14 @@ export default function TransactionsPage() {
             type="button"
             className="btn-excel-export"
             onClick={() => handleExportExcel(false)}
-            title={hasFilters ? `Export ${filtered.length} filtered transactions to Excel` : `Export all ${transactions.length} transactions to Excel`}
+            title={
+              hasFilters
+                ? `Export ${filtered.length} filtered transactions to Excel`
+                : `Export all ${transactions.length} transactions to Excel`
+            }
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            Export Excel {hasFilters ? `(${filtered.length})` : ''}
+            <IconDownload size={14} />
+            <span>Export Excel {hasFilters ? `(${filtered.length})` : ''}</span>
           </button>
 
           <button
@@ -263,66 +366,77 @@ export default function TransactionsPage() {
             onClick={() => setIsImportOpen(true)}
             title="Import transactions from an Excel file (.xlsx, .xls)"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-            </svg>
-            Import Excel
+            <IconUpload size={14} />
+            <span>Import Excel</span>
           </button>
 
           <Link href="/transactions/new" className="btn btn-primary">
-            ➕ New Transaction
+            <IconPlus size={15} />
+            <span>New Transaction</span>
           </Link>
         </div>
       </div>
 
       {/* ── Filter Panel ── */}
       <div className="filter-panel">
-
-        {/* Row 1: Search */}
         <div className="filter-search-row">
           <div className="filter-search-wrap">
-            <svg className="filter-search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-            </svg>
+            <IconSearch size={15} className="filter-search-icon" />
             <input
               type="text"
               className="filter-search-input"
-              placeholder="Search counterparty, notes, currency…"
+              placeholder="Search counterparty, notes, currency, or reference ID…"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
             />
             {search && (
-              <button className="filter-clear-x" onClick={() => setSearch('')}>✕</button>
+              <button type="button" className="filter-clear-x" onClick={() => setSearch('')} aria-label="Clear search">
+                <IconX size={13} />
+              </button>
             )}
           </div>
         </div>
 
-        {/* Row 2: Filter controls */}
         <div className="filter-controls-row">
-
           {/* Type pills */}
           <div className="filter-group">
             <span className="filter-group-label">Type</span>
             <div className="type-pill-group">
-              <button className={`type-pill ${typeFilter === 'all'  ? 'type-pill-active'  : ''}`} onClick={() => setTypeFilter('all')}>All</button>
-              <button className={`type-pill ${typeFilter === 'buy'  ? 'type-pill-buy'   : ''}`} onClick={() => setTypeFilter('buy')}>📈 Buy</button>
-              <button className={`type-pill ${typeFilter === 'sell' ? 'type-pill-sell'  : ''}`} onClick={() => setTypeFilter('sell')}>📉 Sell</button>
+              <button
+                type="button"
+                className={`type-pill ${typeFilter === 'all' ? 'type-pill-active' : ''}`}
+                onClick={() => setTypeFilter('all')}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                className={`type-pill ${typeFilter === 'buy' ? 'type-pill-buy' : ''}`}
+                onClick={() => setTypeFilter('buy')}
+              >
+                Buy
+              </button>
+              <button
+                type="button"
+                className={`type-pill ${typeFilter === 'sell' ? 'type-pill-sell' : ''}`}
+                onClick={() => setTypeFilter('sell')}
+              >
+                Sell
+              </button>
             </div>
           </div>
 
-          <div className="filter-sep" />
-
-          {/* Buyer / Seller (Counterparty) Filter */}
+          {/* Buyer / Seller Filter */}
           <div className="filter-group">
             <span className="filter-group-label">Buyer / Seller</span>
             <select
               className="filter-select-compact"
               value={partyFilter}
-              onChange={e => setPartyFilter(e.target.value)}
+              onChange={(e) => setPartyFilter(e.target.value)}
               style={{ minWidth: 155 }}
             >
               <option value="all">All Parties ({counterpartyOptions.length})</option>
-              {counterpartyOptions.map(p => (
+              {counterpartyOptions.map((p) => (
                 <option key={p.name} value={p.name}>
                   {p.name} {p.role ? `(${p.role})` : ''}
                 </option>
@@ -330,30 +444,32 @@ export default function TransactionsPage() {
             </select>
           </div>
 
-          <div className="filter-sep" />
-
           {/* Currency */}
           <div className="filter-group">
             <span className="filter-group-label">Currency</span>
-            <select className="filter-select-compact" value={currFilter} onChange={e => setCurrFilter(e.target.value)}>
+            <select className="filter-select-compact" value={currFilter} onChange={(e) => setCurrFilter(e.target.value)}>
               <option value="all">All</option>
-              {currencies.map(c => <option key={c} value={c}>{c}</option>)}
+              {currencies.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
             </select>
           </div>
 
           {/* Purity */}
           <div className="filter-group">
             <span className="filter-group-label">Purity</span>
-            <select className="filter-select-compact" value={purFilter} onChange={e => setPurFilter(e.target.value)}>
+            <select className="filter-select-compact" value={purFilter} onChange={(e) => setPurFilter(e.target.value)}>
               <option value="all">All</option>
-              {PURITY_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
+              {PURITY_OPTIONS.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
             </select>
           </div>
 
           {/* Payment */}
           <div className="filter-group">
             <span className="filter-group-label">Payment</span>
-            <select className="filter-select-compact" value={payFilter} onChange={e => setPayFilter(e.target.value)}>
+            <select className="filter-select-compact" value={payFilter} onChange={(e) => setPayFilter(e.target.value)}>
               <option value="all">All</option>
               <option value="Cash">Cash</option>
               <option value="RTGS">RTGS</option>
@@ -363,7 +479,7 @@ export default function TransactionsPage() {
           {/* Source */}
           <div className="filter-group">
             <span className="filter-group-label">Source</span>
-            <select className="filter-select-compact" value={srcFilter} onChange={e => setSrcFilter(e.target.value)}>
+            <select className="filter-select-compact" value={srcFilter} onChange={(e) => setSrcFilter(e.target.value)}>
               <option value="all">All</option>
               <option value="manual">Manual</option>
               <option value="scan">AI Scan</option>
@@ -371,51 +487,44 @@ export default function TransactionsPage() {
             </select>
           </div>
 
-          <div className="filter-sep" />
-
           {/* Date range */}
           <div className="filter-group">
             <span className="filter-group-label">From</span>
-            <input type="date" className="filter-date-compact" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+            <input type="date" className="filter-date-compact" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
           </div>
           <div className="filter-group">
             <span className="filter-group-label">To</span>
-            <input type="date" className="filter-date-compact" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+            <input type="date" className="filter-date-compact" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
           </div>
 
-          {/* Reset */}
           {hasFilters && (
-            <>
-              <div className="filter-sep" />
-              <button className="filter-reset-btn" onClick={clearFilters}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                  <path d="M18 6 6 18M6 6l12 12"/>
-                </svg>
-                Reset
-              </button>
-            </>
+            <button type="button" className="filter-reset-btn" onClick={clearFilters} style={{ alignSelf: 'flex-end' }}>
+              <IconX size={12} />
+              <span>Reset</span>
+            </button>
           )}
         </div>
 
-        {/* Active result count strip */}
         {hasFilters && (
           <div className="filter-result-strip">
             <span className="filter-result-dot" />
-            {filtered.length} result{filtered.length !== 1 ? 's' : ''} of {transactions.length} transactions
-            {partyFilter !== 'all' && (
-              <span style={{ marginLeft: 8, fontWeight: 700 }}>· Filtered by Buyer/Seller: {partyFilter}</span>
-            )}
+            <span>
+              {filtered.length} result{filtered.length !== 1 ? 's' : ''} of {transactions.length} transactions
+              {partyFilter !== 'all' && (
+                <span style={{ marginLeft: 8, fontWeight: 700 }}>· Party: {partyFilter}</span>
+              )}
+            </span>
           </div>
         )}
       </div>
 
-      {/* ── Counterparty Profit & Loss Analytics Overview ── */}
+      {/* ── Counterparty P&L Overview or General Strip ── */}
       {partyFilter !== 'all' ? (
         <div className="counterparty-pnl-card">
           <div className="counterparty-pnl-header">
             <div className="counterparty-title-wrap">
               <span className="counterparty-name">
-                <span>👤</span>
+                <IconUsers size={16} />
                 <span>{partyFilter}</span>
               </span>
               <span
@@ -428,13 +537,13 @@ export default function TransactionsPage() {
                 }`}
               >
                 {activePnLSummary.buyCount > 0 && activePnLSummary.sellCount > 0
-                  ? '🔄 Trading Partner (Buy & Sell)'
+                  ? 'Trading Partner (Buy & Sell)'
                   : activePnLSummary.buyCount > 0
-                  ? '📈 Buyer'
-                  : '📉 Seller'}
+                  ? 'Buyer'
+                  : 'Seller'}
               </span>
               <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                {activePnLSummary.totalTransactions} record{activePnLSummary.totalTransactions !== 1 ? 's' : ''} with this party
+                {activePnLSummary.totalTransactions} record{activePnLSummary.totalTransactions !== 1 ? 's' : ''}
               </span>
             </div>
 
@@ -442,33 +551,35 @@ export default function TransactionsPage() {
               type="button"
               className="btn btn-secondary btn-sm"
               onClick={() => setPartyFilter('all')}
-              style={{ fontSize: 12 }}
             >
-              ✕ Show All Buyers & Sellers
+              <IconX size={12} />
+              <span>Show All Buyers &amp; Sellers</span>
             </button>
           </div>
 
           <div className="counterparty-summary-grid">
-            {/* 1. Net Profit / Loss */}
             <div className={`counterparty-metric-item hero-metric ${!activePnLSummary.isProfit ? 'is-loss' : ''}`}>
               <span className="counterparty-metric-label">
-                {activePnLSummary.isProfit ? '🟢 Net Profit' : '🔴 Net Loss'}
+                {activePnLSummary.isProfit ? 'Net Profit' : 'Net Loss'}
               </span>
               <span
                 className="counterparty-metric-value"
-                style={{ color: activePnLSummary.isProfit ? '#15803d' : '#dc2626' }}
+                style={{ color: activePnLSummary.isProfit ? '#15803d' : '#b91c1c' }}
               >
                 {activePnLSummary.totalPnLGlobal >= 0 ? '+' : '−'}
                 {formatCurrency(Math.abs(activePnLSummary.totalPnLGlobal), globalCurrency)}
               </span>
               <span className="counterparty-metric-sub">
-                <strong>{activePnLSummary.pnlPercent >= 0 ? '+' : ''}{activePnLSummary.pnlPercent.toFixed(2)}%</strong> vs Market Spot
+                <strong>
+                  {activePnLSummary.pnlPercent >= 0 ? '+' : ''}
+                  {activePnLSummary.pnlPercent.toFixed(2)}%
+                </strong>{' '}
+                vs Market Spot
               </span>
             </div>
 
-            {/* 2. Total Purchases (Buy Volume) */}
             <div className="counterparty-metric-item">
-              <span className="counterparty-metric-label">📈 Total Bought</span>
+              <span className="counterparty-metric-label">Total Bought</span>
               <span className="counterparty-metric-value">
                 {formatCurrency(activePnLSummary.totalBuyValueGlobal, globalCurrency)}
               </span>
@@ -480,9 +591,8 @@ export default function TransactionsPage() {
               </span>
             </div>
 
-            {/* 3. Total Sales (Sell Volume) */}
             <div className="counterparty-metric-item">
-              <span className="counterparty-metric-label">📉 Total Sold</span>
+              <span className="counterparty-metric-label">Total Sold</span>
               <span className="counterparty-metric-value">
                 {formatCurrency(activePnLSummary.totalSellValueGlobal, globalCurrency)}
               </span>
@@ -494,9 +604,8 @@ export default function TransactionsPage() {
               </span>
             </div>
 
-            {/* 4. Net Position (Gold & Cash) */}
             <div className="counterparty-metric-item">
-              <span className="counterparty-metric-label">⚖️ Net Balance</span>
+              <span className="counterparty-metric-label">Net Balance</span>
               <span className="counterparty-metric-value" style={{ fontSize: 18 }}>
                 {activePnLSummary.netWeightGrams >= 0 ? '+' : '−'}
                 {Math.abs(activePnLSummary.netWeightGrams).toFixed(2)} g
@@ -507,14 +616,13 @@ export default function TransactionsPage() {
               </span>
             </div>
 
-            {/* 5. Spread Margin (if roundtrip exists) */}
             {activePnLSummary.matchedGrams > 0 && (
               <div className="counterparty-metric-item">
-                <span className="counterparty-metric-label">🏷️ Trading Spread</span>
+                <span className="counterparty-metric-label">Trading Spread</span>
                 <span
                   className="counterparty-metric-value"
                   style={{
-                    color: activePnLSummary.spreadPerGramGlobal >= 0 ? '#15803d' : '#dc2626',
+                    color: activePnLSummary.spreadPerGramGlobal >= 0 ? '#15803d' : '#b91c1c',
                     fontSize: 18,
                   }}
                 >
@@ -529,29 +637,30 @@ export default function TransactionsPage() {
           </div>
         </div>
       ) : (
-        /* General P&L Strip when viewing all */
         <div className="pnl-strip-container">
           <div className="pnl-strip-stats">
             <div className="pnl-strip-stat">
-              <span className="pnl-strip-stat-label">Records:</span>
+              <span className="pnl-strip-stat-label">Records</span>
               <span className="pnl-strip-stat-val">{filtered.length}</span>
             </div>
             <div className="pnl-strip-stat">
-              <span className="pnl-strip-stat-label">Total Volume:</span>
+              <span className="pnl-strip-stat-label">Total Volume</span>
               <span className="pnl-strip-stat-val">{formatCurrency(filteredTotalInGlobal, globalCurrency)}</span>
             </div>
             <div className="pnl-strip-stat">
-              <span className="pnl-strip-stat-label">Net Profit / Loss:</span>
+              <span className="pnl-strip-stat-label">Net Profit / Loss</span>
               <span className={`pnl-strip-stat-val ${activePnLSummary.isProfit ? 'profit' : 'loss'}`}>
                 {activePnLSummary.totalPnLGlobal >= 0 ? '+' : '−'}
-                {formatCurrency(Math.abs(activePnLSummary.totalPnLGlobal), globalCurrency)}
-                {' '}({activePnLSummary.pnlPercent >= 0 ? '+' : ''}{activePnLSummary.pnlPercent.toFixed(1)}%)
+                {formatCurrency(Math.abs(activePnLSummary.totalPnLGlobal), globalCurrency)} (
+                {activePnLSummary.pnlPercent >= 0 ? '+' : ''}
+                {activePnLSummary.pnlPercent.toFixed(1)}%)
               </span>
             </div>
             <div className="pnl-strip-stat">
-              <span className="pnl-strip-stat-label">Net Gold:</span>
+              <span className="pnl-strip-stat-label">Net Gold</span>
               <span className="pnl-strip-stat-val">
-                {activePnLSummary.netWeightGrams >= 0 ? '+' : '−'}{Math.abs(activePnLSummary.netWeightGrams).toFixed(2)} g
+                {activePnLSummary.netWeightGrams >= 0 ? '+' : '−'}
+                {Math.abs(activePnLSummary.netWeightGrams).toFixed(2)} g
               </span>
             </div>
           </div>
@@ -562,8 +671,8 @@ export default function TransactionsPage() {
             onClick={() => setShowRankingModal(true)}
             title="View profit & loss ranking across all buyers & sellers"
           >
-            <span>📊</span>
-            <span>View All Buyers & Sellers P&L ({counterpartyOptions.length})</span>
+            <IconBarChart size={14} />
+            <span>Buyers &amp; Sellers P&amp;L ({counterpartyOptions.length})</span>
           </button>
         </div>
       )}
@@ -571,172 +680,235 @@ export default function TransactionsPage() {
       {/* Table */}
       {filtered.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-state-icon">📭</div>
+          <div className="empty-state-icon">
+            <IconLedger size={34} />
+          </div>
           <div className="empty-state-title">No transactions found</div>
           <div className="empty-state-text">
-            {hasFilters ? 'Try adjusting your filters.' : 'Record your first transaction to get started.'}
+            {hasFilters ? 'Try adjusting your filters to see matching records.' : 'Record your first gold transaction to get started.'}
           </div>
           {!hasFilters && (
-            <Link href="/transactions/new" className="btn btn-primary">➕ Add Transaction</Link>
+            <Link href="/transactions/new" className="btn btn-primary">
+              <IconPlus size={15} />
+              <span>Add Transaction</span>
+            </Link>
           )}
         </div>
       ) : (
-        <div className="table-wrapper">
-          <table className="tx-table">
-            <thead>
-              <tr>
-                <th onClick={() => handleSort('type')}>Type <SortIcon k="type" /></th>
-                <th onClick={() => handleSort('dateTime')}>Date <SortIcon k="dateTime" /></th>
-                <th onClick={() => handleSort('purity')}>Purity <SortIcon k="purity" /></th>
-                <th>Weight</th>
-                <th onClick={() => handleSort('totalValue')}>Total Value <SortIcon k="totalValue" /></th>
-                <th onClick={() => handleSort('pnl')} title="Click to sort by Profit / Loss">Profit / Loss <SortIcon k="pnl" /></th>
-                <th onClick={() => handleSort('currency')}>Currency <SortIcon k="currency" /></th>
-                <th>Payment</th>
-                <th>Rate (USD)</th>
-                <th onClick={() => handleSort('counterparty')}>Counterparty <SortIcon k="counterparty" /></th>
-                <th>Source</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(tx => (
-                <tr key={tx.id}>
-                  <td>
-                    <span className={`tx-badge ${tx.type}`}>
-                      {tx.type === 'buy' ? '📈' : '📉'} {tx.type}
+        <>
+          {/* Bulk Action Bar */}
+          {selectedIds.size > 0 && (
+            <div className="bulk-action-bar">
+              <div className="bulk-action-info">
+                <span className="bulk-action-count">{selectedIds.size}</span>
+                <span>
+                  {selectedIds.size} transaction{selectedIds.size !== 1 ? 's' : ''} selected
+                  {filtered.length > selectedIds.size && (
+                    <span style={{ color: '#78716c', fontWeight: 500, fontSize: 12 }}>
+                      {' '}
+                      (of {filtered.length} filtered)
                     </span>
-                  </td>
-                  <td style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
-                    {formatDate(tx.dateTime)}
-                  </td>
-                  <td><span className="purity-tag">{purityLabel(tx.purity, tx.customPurity)}</span></td>
-                  <td>{tx.weight} {tx.weightUnit.replace('_', ' ')}</td>
-                  <td className="font-bold">
-                    <div>{formatCurrency(tx.totalValue, tx.currency)}</div>
-                    {tx.currency !== globalCurrency && (
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500, marginTop: 2 }}>
-                        ≈ {formatCurrency(convertCurrency(tx.totalValue, tx.currency, globalCurrency), globalCurrency)}
-                      </div>
-                    )}
-                  </td>
-                  <td>
-                    {(() => {
-                      const txPnL = calculateTransactionPnL(tx, globalCurrency);
-                      return (
-                        <div
-                          className={`pnl-badge ${txPnL.pnlGlobal > 0 ? 'profit' : txPnL.pnlGlobal < 0 ? 'loss' : 'neutral'}`}
-                          title={`${tx.type === 'buy' ? 'Buy Acquisition' : 'Sale'}: Total ${formatCurrency(txPnL.actualTotalGlobal, globalCurrency)} vs Benchmark ${formatCurrency(txPnL.benchmarkGlobal, globalCurrency)}`}
-                        >
-                          <span className="pnl-amount">
-                            {txPnL.pnlGlobal >= 0 ? '+' : '−'}
-                            {formatCurrency(Math.abs(txPnL.pnlGlobal), globalCurrency)}
-                          </span>
-                          <span className="pnl-percent">
-                            {txPnL.pnlPercent >= 0 ? '+' : ''}{txPnL.pnlPercent.toFixed(1)}% {tx.type === 'buy' ? 'disc' : 'gain'}
-                          </span>
-                        </div>
-                      );
-                    })()}
-                  </td>
-                  <td style={{ color: 'var(--text-muted)' }}>{tx.currency}</td>
-                  <td>
-                    <span className={`payment-badge ${(tx.paymentType || 'Cash').toLowerCase()}`}>
-                      {tx.paymentType === 'RTGS' ? '🏦 RTGS' : '💵 Cash'}
-                    </span>
-                    {tx.paymentType === 'RTGS' && tx.transactionId && (
-                      <div
-                        style={{
-                          fontSize: 10.5,
-                          color: 'var(--text-secondary)',
-                          fontFamily: 'monospace',
-                          marginTop: 3,
-                          letterSpacing: '0.02em',
-                        }}
-                        title={`Transaction ID: ${tx.transactionId}`}
-                      >
-                        #{tx.transactionId}
-                      </div>
-                    )}
-                  </td>
-                  <td style={{ color: 'var(--text-muted)' }}>
-                    <div>${tx.marketRate.toLocaleString()}</div>
-                    {globalCurrency !== 'USD' && (
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                        ≈ {formatCurrency(convertUSDTo(tx.marketRate, globalCurrency), globalCurrency)}
-                      </div>
-                    )}
-                  </td>
-                  <td style={{ maxWidth: 170 }}>
-                    {tx.counterparty ? (
-                      <button
-                        type="button"
-                        className="btn-ghost"
-                        onClick={() => setPartyFilter(tx.counterparty)}
-                        style={{
-                          padding: '3px 8px',
-                          fontSize: 12,
-                          fontWeight: 600,
-                          color: partyFilter.toLowerCase() === tx.counterparty.toLowerCase() ? 'var(--gold-600)' : 'var(--text-primary)',
-                          textDecoration: 'underline',
-                          textUnderlineOffset: 3,
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                          borderRadius: 4,
-                          background: partyFilter.toLowerCase() === tx.counterparty.toLowerCase() ? 'rgba(245, 158, 11, 0.12)' : 'transparent',
-                        }}
-                        title={`Click to filter all transactions and see P&L for ${tx.counterparty}`}
-                      >
-                        👤 {tx.counterparty}
-                      </button>
-                    ) : (
-                      <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>
-                    )}
-                  </td>
-                  <td>
-                    <span className={`source-badge ${tx.source}`}>
-                      {tx.source === 'scan' ? '🤖' : tx.source === 'import' ? '📊' : '✍️'} {tx.source === 'import' ? 'excel' : tx.source}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="actions-cell">
-                      <button
-                        id={`edit-${tx.id}`}
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => setEditTx(tx)}
-                        title="Edit"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        id={`delete-${tx.id}`}
-                        className="btn btn-danger btn-sm"
-                        onClick={() => setDeleteId(tx.id)}
-                        title="Delete"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </td>
+                  )}
+                </span>
+              </div>
+              <div className="bulk-action-btns">
+                {filtered.length > selectedIds.size && (
+                  <button
+                    type="button"
+                    className="btn-bulk-clear"
+                    onClick={() => setSelectedIds(new Set(filtered.map((t) => t.id)))}
+                  >
+                    Select All ({filtered.length})
+                  </button>
+                )}
+                <button type="button" className="btn-bulk-clear" onClick={clearSelection}>
+                  Clear Selection
+                </button>
+                <button type="button" className="btn-bulk-delete" onClick={() => setShowBulkDeleteModal(true)}>
+                  <IconTrash size={13} />
+                  <span>Delete Selected ({selectedIds.size})</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="table-wrapper">
+            <table className="tx-table">
+              <thead>
+                <tr>
+                  <th className="table-checkbox-cell" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      className="table-checkbox"
+                      checked={allVisibleSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = isIndeterminate;
+                      }}
+                      onChange={toggleSelectAll}
+                      aria-label="Select all transactions"
+                    />
+                  </th>
+                  <th onClick={() => handleSort('type')}>Type <SortIcon k="type" /></th>
+                  <th onClick={() => handleSort('dateTime')}>Date <SortIcon k="dateTime" /></th>
+                  <th onClick={() => handleSort('purity')}>Purity <SortIcon k="purity" /></th>
+                  <th className="num-col">Weight</th>
+                  <th className="num-col" onClick={() => handleSort('totalValue')}>Total Value <SortIcon k="totalValue" /></th>
+                  <th onClick={() => handleSort('pnl')} title="Click to sort by Profit / Loss">Profit / Loss <SortIcon k="pnl" /></th>
+                  <th onClick={() => handleSort('currency')}>Currency <SortIcon k="currency" /></th>
+                  <th>Payment</th>
+                  <th className="num-col">Rate (USD)</th>
+                  <th onClick={() => handleSort('counterparty')}>Counterparty <SortIcon k="counterparty" /></th>
+                  <th>Source</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {filtered.map((tx) => (
+                  <tr key={tx.id} className={selectedIds.has(tx.id) ? 'row-selected' : ''}>
+                    <td className="table-checkbox-cell" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        className="table-checkbox"
+                        checked={selectedIds.has(tx.id)}
+                        onChange={() => toggleSelect(tx.id)}
+                        aria-label={`Select transaction ${tx.id}`}
+                      />
+                    </td>
+                    <td>
+                      <span className={`tx-badge ${tx.type}`}>
+                        {tx.type === 'buy' ? <IconArrowDownLeft size={11} /> : <IconArrowUpRight size={11} />}
+                        <span>{tx.type}</span>
+                      </span>
+                    </td>
+                    <td style={{ color: 'var(--text-secondary)', fontSize: 12.5 }}>{formatDate(tx.dateTime)}</td>
+                    <td>
+                      <span className="purity-tag">{purityLabel(tx.purity, tx.customPurity)}</span>
+                    </td>
+                    <td className="num-col">{tx.weight} {tx.weightUnit.replace('_', ' ')}</td>
+                    <td className="num-col font-bold">
+                      <div>{formatCurrency(tx.totalValue, tx.currency)}</div>
+                      {tx.currency !== globalCurrency && (
+                        <div className="cell-sub">
+                          ≈ {formatCurrency(convertCurrency(tx.totalValue, tx.currency, globalCurrency), globalCurrency)}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      {(() => {
+                        const txPnL = calculateTransactionPnL(tx, globalCurrency);
+                        return (
+                          <div
+                            className={`pnl-badge ${txPnL.pnlGlobal > 0 ? 'profit' : txPnL.pnlGlobal < 0 ? 'loss' : 'neutral'}`}
+                            title={`${tx.type === 'buy' ? 'Buy Acquisition' : 'Sale'}: Total ${formatCurrency(txPnL.actualTotalGlobal, globalCurrency)} vs Benchmark ${formatCurrency(txPnL.benchmarkGlobal, globalCurrency)}`}
+                          >
+                            <span className="pnl-amount">
+                              {txPnL.pnlGlobal >= 0 ? '+' : '−'}
+                              {formatCurrency(Math.abs(txPnL.pnlGlobal), globalCurrency)}
+                            </span>
+                            <span className="pnl-percent">
+                              {txPnL.pnlPercent >= 0 ? '+' : ''}
+                              {txPnL.pnlPercent.toFixed(1)}% {tx.type === 'buy' ? 'disc' : 'gain'}
+                            </span>
+                          </div>
+                        );
+                      })()}
+                    </td>
+                    <td style={{ color: 'var(--text-muted)' }}>{tx.currency}</td>
+                    <td>
+                      <span className={`payment-badge ${(tx.paymentType || 'Cash').toLowerCase()}`}>
+                        {tx.paymentType === 'RTGS' ? <IconLandmark size={11} /> : <IconBanknote size={11} />}
+                        <span>{tx.paymentType === 'RTGS' ? 'RTGS' : 'Cash'}</span>
+                      </span>
+                      {tx.paymentType === 'RTGS' && tx.transactionId && (
+                        <div className="cell-ref-id" title={`Transaction ID: ${tx.transactionId}`}>
+                          #{tx.transactionId}
+                        </div>
+                      )}
+                    </td>
+                    <td className="num-col" style={{ color: 'var(--text-secondary)' }}>
+                      <div>${tx.marketRate.toLocaleString()}</div>
+                      {globalCurrency !== 'USD' && (
+                        <div className="cell-sub">
+                          ≈ {formatCurrency(convertUSDTo(tx.marketRate, globalCurrency), globalCurrency)}
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ maxWidth: 170 }}>
+                      {tx.counterparty ? (
+                        <button
+                          type="button"
+                          className="counterparty-link-btn"
+                          onClick={() => setPartyFilter(tx.counterparty)}
+                          style={{
+                            color:
+                              partyFilter.toLowerCase() === tx.counterparty.toLowerCase()
+                                ? 'var(--gold-600)'
+                                : 'var(--text-primary)',
+                            background:
+                              partyFilter.toLowerCase() === tx.counterparty.toLowerCase()
+                                ? 'rgba(217, 119, 6, 0.1)'
+                                : 'transparent',
+                          }}
+                          title={`Filter transactions and P&L for ${tx.counterparty}`}
+                        >
+                          {tx.counterparty}
+                        </button>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)' }}>—</span>
+                      )}
+                    </td>
+                    <td>
+                      <span className={`source-badge ${tx.source}`}>
+                        {tx.source === 'scan' ? <IconScan size={11} /> : tx.source === 'import' ? <IconUpload size={11} /> : <IconEdit size={11} />}
+                        <span>{tx.source === 'import' ? 'excel' : tx.source}</span>
+                      </span>
+                    </td>
+                    <td>
+                      <div className="actions-cell" style={{ justifyContent: 'flex-end' }}>
+                        <button
+                          type="button"
+                          id={`edit-${tx.id}`}
+                          className="btn btn-ghost btn-icon-only"
+                          onClick={() => setEditTx(tx)}
+                          title="Edit transaction"
+                          aria-label="Edit transaction"
+                        >
+                          <IconEdit size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          id={`delete-${tx.id}`}
+                          className="btn btn-danger btn-icon-only"
+                          onClick={() => setDeleteId(tx.id)}
+                          title="Delete transaction"
+                          aria-label="Delete transaction"
+                        >
+                          <IconTrash size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {/* Counterparty Ranking Modal */}
       {showRankingModal && (
-        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowRankingModal(false); }}>
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowRankingModal(false); }}>
           <div className="modal" style={{ maxWidth: 820 }}>
             <div className="modal-header">
               <div>
-                <span className="modal-title">📊 Buyers & Sellers Profit & Loss Ranking</span>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                  Complete P&L breakdown by counterparty in {globalCurrency}
+                <span className="modal-title">Buyers &amp; Sellers Profit &amp; Loss Ranking</span>
+                <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>
+                  Complete P&amp;L breakdown by counterparty in {globalCurrency}
                 </div>
               </div>
-              <button className="btn btn-ghost btn-sm" onClick={() => setShowRankingModal(false)}>✕</button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowRankingModal(false)} aria-label="Close modal">
+                <IconX size={16} />
+              </button>
             </div>
 
             <div className="modal-body" style={{ padding: 0 }}>
@@ -745,45 +917,52 @@ export default function TransactionsPage() {
                   <thead>
                     <tr>
                       <th>Counterparty</th>
-                      <th>Deals</th>
-                      <th>Bought (Volume)</th>
-                      <th>Sold (Volume)</th>
-                      <th>Net Position</th>
-                      <th>Total P&L</th>
+                      <th className="num-col">Deals</th>
+                      <th className="num-col">Bought (Volume)</th>
+                      <th className="num-col">Sold (Volume)</th>
+                      <th className="num-col">Net Position</th>
+                      <th>Total P&amp;L</th>
                       <th style={{ textAlign: 'right' }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {counterpartiesRanking.map(item => (
-                      <tr key={item.counterparty} onClick={() => {
-                        setPartyFilter(item.counterparty);
-                        setShowRankingModal(false);
-                      }}>
+                    {counterpartiesRanking.map((item) => (
+                      <tr
+                        key={item.counterparty}
+                        onClick={() => {
+                          setPartyFilter(item.counterparty);
+                          setShowRankingModal(false);
+                        }}
+                      >
                         <td>
-                          <div style={{ fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span>👤</span>
-                            <span>{item.counterparty}</span>
+                          <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                            {item.counterparty}
                           </div>
                           <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                            {item.buyCount > 0 && item.sellCount > 0 ? 'Buyer & Seller' :
-                             item.buyCount > 0 ? 'Buyer' : 'Seller'}
+                            {item.buyCount > 0 && item.sellCount > 0
+                              ? 'Buyer & Seller'
+                              : item.buyCount > 0
+                              ? 'Buyer'
+                              : 'Seller'}
                           </div>
                         </td>
-                        <td>{item.totalTransactions}</td>
-                        <td>
+                        <td className="num-col">{item.totalTransactions}</td>
+                        <td className="num-col">
                           <div style={{ fontWeight: 600 }}>{formatCurrency(item.totalBuyValueGlobal, globalCurrency)}</div>
                           <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{item.totalBuyWeightGrams.toFixed(2)} g</div>
                         </td>
-                        <td>
+                        <td className="num-col">
                           <div style={{ fontWeight: 600 }}>{formatCurrency(item.totalSellValueGlobal, globalCurrency)}</div>
                           <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{item.totalSellWeightGrams.toFixed(2)} g</div>
                         </td>
-                        <td>
-                          <div style={{ fontWeight: 600, color: item.netWeightGrams >= 0 ? '#15803d' : '#dc2626' }}>
-                            {item.netWeightGrams >= 0 ? '+' : '−'}{Math.abs(item.netWeightGrams).toFixed(2)} g
+                        <td className="num-col">
+                          <div style={{ fontWeight: 600, color: item.netWeightGrams >= 0 ? '#15803d' : '#b91c1c' }}>
+                            {item.netWeightGrams >= 0 ? '+' : '−'}
+                            {Math.abs(item.netWeightGrams).toFixed(2)} g
                           </div>
                           <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                            Cash: {item.netCashFlowGlobal >= 0 ? '+' : '−'}{formatCurrency(Math.abs(item.netCashFlowGlobal), globalCurrency)}
+                            Cash: {item.netCashFlowGlobal >= 0 ? '+' : '−'}
+                            {formatCurrency(Math.abs(item.netCashFlowGlobal), globalCurrency)}
                           </div>
                         </td>
                         <td>
@@ -793,7 +972,8 @@ export default function TransactionsPage() {
                               {formatCurrency(Math.abs(item.totalPnLGlobal), globalCurrency)}
                             </span>
                             <span className="pnl-percent">
-                              {item.pnlPercent >= 0 ? '+' : ''}{item.pnlPercent.toFixed(1)}% margin
+                              {item.pnlPercent >= 0 ? '+' : ''}
+                              {item.pnlPercent.toFixed(1)}% margin
                             </span>
                           </div>
                         </td>
@@ -801,7 +981,7 @@ export default function TransactionsPage() {
                           <button
                             type="button"
                             className="btn btn-secondary btn-sm"
-                            style={{ fontSize: 11, padding: '4px 10px' }}
+                            style={{ fontSize: 11.5, padding: '4px 10px' }}
                             onClick={(e) => {
                               e.stopPropagation();
                               setPartyFilter(item.counterparty);
@@ -819,7 +999,9 @@ export default function TransactionsPage() {
             </div>
 
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowRankingModal(false)}>Close</button>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowRankingModal(false)}>
+                Close
+              </button>
             </div>
           </div>
         </div>
@@ -827,11 +1009,13 @@ export default function TransactionsPage() {
 
       {/* Edit Modal */}
       {editTx && (
-        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setEditTx(null); }}>
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setEditTx(null); }}>
           <div className="modal">
             <div className="modal-header">
-              <span className="modal-title">✏️ Edit Transaction</span>
-              <button className="btn btn-ghost btn-sm" onClick={() => setEditTx(null)}>✕</button>
+              <span className="modal-title">Edit Transaction</span>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditTx(null)} aria-label="Close modal">
+                <IconX size={16} />
+              </button>
             </div>
             <div className="modal-body">
               <TransactionForm
@@ -847,11 +1031,13 @@ export default function TransactionsPage() {
 
       {/* Delete Confirm Modal */}
       {deleteId && (
-        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setDeleteId(null); }}>
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setDeleteId(null); }}>
           <div className="modal" style={{ maxWidth: 400 }}>
             <div className="modal-header">
-              <span className="modal-title">🗑️ Confirm Delete</span>
-              <button className="btn btn-ghost btn-sm" onClick={() => setDeleteId(null)}>✕</button>
+              <span className="modal-title">Confirm Delete</span>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setDeleteId(null)} aria-label="Close modal">
+                <IconX size={16} />
+              </button>
             </div>
             <div className="modal-body">
               <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
@@ -859,14 +1045,66 @@ export default function TransactionsPage() {
               </p>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setDeleteId(null)}>Cancel</button>
-              <button className="btn btn-danger" onClick={() => confirmDelete(deleteId)}>
-                🗑️ Delete
+              <button type="button" className="btn btn-secondary" onClick={() => setDeleteId(null)}>Cancel</button>
+              <button type="button" className="btn btn-danger" onClick={() => confirmDelete(deleteId)}>
+                <IconTrash size={14} />
+                <span>Delete</span>
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Bulk Delete Confirm Modal */}
+      {showBulkDeleteModal && (
+        <div
+          className="modal-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isDeletingBulk) setShowBulkDeleteModal(false);
+          }}
+        >
+          <div className="modal" style={{ maxWidth: 440 }}>
+            <div className="modal-header">
+              <span className="modal-title">
+                Delete {selectedIds.size} Transaction{selectedIds.size !== 1 ? 's' : ''}
+              </span>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                disabled={isDeletingBulk}
+                onClick={() => setShowBulkDeleteModal(false)}
+                aria-label="Close modal"
+              >
+                <IconX size={16} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ color: 'var(--text-secondary)', fontSize: 14, lineHeight: 1.5 }}>
+                Are you sure you want to delete the{' '}
+                <strong>
+                  {selectedIds.size} selected transaction{selectedIds.size !== 1 ? 's' : ''}
+                </strong>
+                ? This action is permanent and cannot be undone.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={isDeletingBulk}
+                onClick={() => setShowBulkDeleteModal(false)}
+              >
+                Cancel
+              </button>
+              <button type="button" className="btn btn-danger" disabled={isDeletingBulk} onClick={handleBulkDelete}>
+                <IconTrash size={14} />
+                <span>{isDeletingBulk ? 'Deleting…' : `Yes, Delete (${selectedIds.size})`}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Excel Import Modal */}
       <ExcelImportModal
         isOpen={isImportOpen}

@@ -6,6 +6,24 @@ import { useToast } from '@/components/Toast';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 import { MoneyTransfer, PaymentType, TransferType } from '@/lib/types';
 import { CURRENCIES, convertCurrency } from '@/lib/currencies';
+import {
+  IconArrowDownLeft,
+  IconArrowUpRight,
+  IconTransfer,
+  IconPlus,
+  IconSearch,
+  IconX,
+  IconCheck,
+  IconClock,
+  IconEdit,
+  IconTrash,
+  IconWallet,
+  IconCoins,
+  IconBarChart,
+  IconLandmark,
+  IconBanknote,
+  IconAlert,
+} from '@/components/Icons';
 
 type SortKey = 'dateTime' | 'amount' | 'senderName' | 'receiverName' | 'netProfit' | 'status' | 'transferType';
 
@@ -21,6 +39,7 @@ export default function MoneyTransfersPage() {
     addMoneyTransfer,
     updateMoneyTransfer,
     deleteMoneyTransfer,
+    deleteMoneyTransfers,
     globalCurrency,
     setGlobalCurrency,
     loading,
@@ -34,6 +53,11 @@ export default function MoneyTransfersPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+
+  // Multiple selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
 
   // Sort
   const [sortKey, setSortKey] = useState<SortKey>('dateTime');
@@ -121,15 +145,14 @@ export default function MoneyTransfersPage() {
   if (formData.transferType === 'receive') {
     formSenderFee = formAmount * (parsedSenderPercent / 100);
     formReceiverFee = 0;
-    formNetProfit = formSenderFee; // Our earning
-    formDelivered = formAmount - formSenderFee; // Net cash deposit
+    formNetProfit = formSenderFee;
+    formDelivered = formAmount - formSenderFee;
   } else if (formData.transferType === 'send') {
     formSenderFee = 0;
     formReceiverFee = formAmount * (parsedReceiverPercent / 100);
-    formNetProfit = -formReceiverFee; // Our payout cost
-    formDelivered = formAmount - formReceiverFee; // Delivered after receiver's charge
+    formNetProfit = -formReceiverFee;
+    formDelivered = formAmount - formReceiverFee;
   } else {
-    // Both (Direct paired transfer)
     formSenderFee = formAmount * (parsedSenderPercent / 100);
     formReceiverFee = formAmount * (parsedReceiverPercent / 100);
     formNetProfit = formSenderFee - formReceiverFee;
@@ -189,10 +212,10 @@ export default function MoneyTransfersPage() {
         await addMoneyTransfer(payload);
         showToast(
           formData.transferType === 'receive'
-            ? `Recorded receipt of ${formatCurrency(formAmount, formData.currency)} from ${formData.senderName}!`
+            ? `Recorded receipt of ${formatCurrency(formAmount, formData.currency)} from ${formData.senderName}`
             : formData.transferType === 'send'
-            ? `Recorded disbursement of ${formatCurrency(formAmount, formData.currency)} to ${formData.receiverName}!`
-            : `Recorded transfer from ${formData.senderName} to ${formData.receiverName}!`,
+            ? `Recorded disbursement of ${formatCurrency(formAmount, formData.currency)} to ${formData.receiverName}`
+            : `Recorded transfer from ${formData.senderName} to ${formData.receiverName}`,
           'success'
         );
       }
@@ -214,14 +237,19 @@ export default function MoneyTransfersPage() {
   }
 
   function handleSort(key: SortKey) {
-    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    else { setSortKey(key); setSortDir('desc'); }
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
   }
 
   const filtered = useMemo(() => {
     return moneyTransfers
-      .filter(t => {
-        const itemType = t.transferType || (t.senderName && !t.receiverName ? 'receive' : !t.senderName && t.receiverName ? 'send' : 'both');
+      .filter((t) => {
+        const itemType =
+          t.transferType ||
+          (t.senderName && !t.receiverName ? 'receive' : !t.senderName && t.receiverName ? 'send' : 'both');
         if (typeFilter !== 'all' && itemType !== typeFilter) return false;
         if (statusFilter !== 'all' && t.status !== statusFilter) return false;
         if (dateFrom && t.dateTime < dateFrom) return false;
@@ -256,7 +284,6 @@ export default function MoneyTransfersPage() {
 
   const hasFilters = search || typeFilter !== 'all' || statusFilter !== 'all' || dateFrom || dateTo;
 
-  // Stats
   const stats = useMemo(() => {
     const total = filtered.length;
     const totalAmount = filtered.reduce((s, t) => s + convertCurrency(t.amount, t.currency, globalCurrency), 0);
@@ -264,17 +291,17 @@ export default function MoneyTransfersPage() {
     const totalDelivered = filtered.reduce((s, t) => s + convertCurrency(t.amountDelivered, t.currency, globalCurrency), 0);
     const totalSenderFee = filtered.reduce((s, t) => s + convertCurrency(t.senderFee, t.currency, globalCurrency), 0);
     const totalReceiverFee = filtered.reduce((s, t) => s + convertCurrency(t.receiverFee, t.currency, globalCurrency), 0);
-    const receiveCount = filtered.filter(t => (t.transferType || (t.senderName && !t.receiverName ? 'receive' : 'both')) === 'receive').length;
-    const sendCount = filtered.filter(t => (t.transferType || (!t.senderName && t.receiverName ? 'send' : 'both')) === 'send').length;
-    const pending = filtered.filter(t => t.status === 'pending').length;
-    const completed = filtered.filter(t => t.status === 'completed').length;
+    const receiveCount = filtered.filter((t) => (t.transferType || (t.senderName && !t.receiverName ? 'receive' : 'both')) === 'receive').length;
+    const sendCount = filtered.filter((t) => (t.transferType || (!t.senderName && t.receiverName ? 'send' : 'both')) === 'send').length;
+    const pending = filtered.filter((t) => t.status === 'pending').length;
+    const completed = filtered.filter((t) => t.status === 'completed').length;
 
-    // Calculate Remaining Transfer Amount (Amount received to transfer minus Amount sent, excluding profit/fees)
     let totalReceived = 0;
     let totalSent = 0;
     filtered.forEach((t) => {
       if (statusFilter !== 'cancelled' && t.status === 'cancelled') return;
-      const itemType: TransferType = t.transferType || (t.senderName && !t.receiverName ? 'receive' : !t.senderName && t.receiverName ? 'send' : 'both');
+      const itemType: TransferType =
+        t.transferType || (t.senderName && !t.receiverName ? 'receive' : !t.senderName && t.receiverName ? 'send' : 'both');
       const amt = convertCurrency(t.amount, t.currency, globalCurrency);
 
       if (itemType === 'receive') {
@@ -305,6 +332,54 @@ export default function MoneyTransfersPage() {
     };
   }, [filtered, globalCurrency, statusFilter]);
 
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const allVisibleSelected = filtered.length > 0 && filtered.every((mt) => selectedIds.has(mt.id));
+  const isIndeterminate = !allVisibleSelected && filtered.some((mt) => selectedIds.has(mt.id));
+
+  function toggleSelectAll() {
+    if (allVisibleSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        filtered.forEach((mt) => next.delete(mt.id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        filtered.forEach((mt) => next.add(mt.id));
+        return next;
+      });
+    }
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    setIsDeletingBulk(true);
+    try {
+      const idsArray = Array.from(selectedIds);
+      await deleteMoneyTransfers(idsArray);
+      showToast(`Deleted ${idsArray.length} gold transfer${idsArray.length !== 1 ? 's' : ''}`, 'success');
+      setSelectedIds(new Set());
+      setShowBulkDeleteModal(false);
+    } catch {
+      showToast('Failed to delete gold transfers', 'error');
+    } finally {
+      setIsDeletingBulk(false);
+    }
+  }
+
   const SortIcon = ({ k }: { k: SortKey }) =>
     sortKey === k ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ' ↕';
 
@@ -320,7 +395,9 @@ export default function MoneyTransfersPage() {
   if (error) {
     return (
       <div className="page-error">
-        <div style={{ fontSize: 40 }}>⚠️</div>
+        <div className="page-error-icon">
+          <IconAlert size={32} />
+        </div>
         <h2>Connection Error</h2>
         <p>{error}</p>
       </div>
@@ -334,13 +411,15 @@ export default function MoneyTransfersPage() {
         <div>
           <h1 className="page-title">Gold Transfer</h1>
           <p className="page-subtitle">
-            {filtered.length} of {moneyTransfers.length} transfers · Total Volume: <strong>{formatCurrency(stats.totalAmount, globalCurrency)}</strong>
+            {filtered.length} of {moneyTransfers.length} transfers · Volume{' '}
+            <strong>{formatCurrency(stats.totalAmount, globalCurrency)}</strong>
           </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div className="page-header-actions">
           <div className="global-currency-badge" title="Change global display currency">
-            <label>Currency:</label>
+            <label htmlFor="mt-currency">Currency</label>
             <select
+              id="mt-currency"
               className="global-currency-select"
               value={globalCurrency}
               onChange={(e) => setGlobalCurrency(e.target.value)}
@@ -358,9 +437,9 @@ export default function MoneyTransfersPage() {
             className="btn btn-secondary"
             onClick={() => openNewForm('receive')}
             title="Record money received from customer/sender (0.1% fee)"
-            style={{ fontWeight: 600 }}
           >
-            📥 Receive Money
+            <IconArrowDownLeft size={14} />
+            <span>Receive</span>
           </button>
 
           <button
@@ -368,9 +447,9 @@ export default function MoneyTransfersPage() {
             className="btn btn-secondary"
             onClick={() => openNewForm('send')}
             title="Record money given to receiver (0.05% fee)"
-            style={{ fontWeight: 600 }}
           >
-            📤 Send Money
+            <IconArrowUpRight size={14} />
+            <span>Send</span>
           </button>
 
           <button
@@ -379,7 +458,8 @@ export default function MoneyTransfersPage() {
             onClick={() => openNewForm('both')}
             title="Record direct transfer from sender to receiver"
           >
-            ➕ New Transfer
+            <IconPlus size={15} />
+            <span>New Transfer</span>
           </button>
         </div>
       </div>
@@ -387,23 +467,27 @@ export default function MoneyTransfersPage() {
       {/* ── Stats Cards ── */}
       <div className="mt-stats-grid">
         <div className="mt-stat-card balance">
-          <div className="mt-stat-icon">💵</div>
+          <div className="stat-icon-badge" title="Remaining transfer balance">
+            <IconWallet size={14} />
+          </div>
           <div className="mt-stat-content">
             <span className="mt-stat-label">Total Amount</span>
             <span
               className="mt-stat-value"
-              style={{ color: stats.remainingAmount >= 0 ? '#0284c7' : '#dc2626' }}
+              style={{ color: stats.remainingAmount >= 0 ? '#0369a1' : '#b91c1c' }}
               title={`Received: ${formatCurrency(stats.totalReceived, globalCurrency)} · Sent: ${formatCurrency(stats.totalSent, globalCurrency)}`}
             >
-              {stats.remainingAmount >= 0 ? '' : '−'}{formatCurrency(Math.abs(stats.remainingAmount), globalCurrency)}
+              {stats.remainingAmount >= 0 ? '' : '−'}
+              {formatCurrency(Math.abs(stats.remainingAmount), globalCurrency)}
             </span>
-            <span className="mt-stat-sub">
-              Remaining balance
-            </span>
+            <span className="mt-stat-sub">Remaining balance</span>
           </div>
         </div>
+
         <div className="mt-stat-card">
-          <div className="mt-stat-icon">💰</div>
+          <div className="stat-icon-badge" title="Total transfer volume">
+            <IconCoins size={14} />
+          </div>
           <div className="mt-stat-content">
             <span className="mt-stat-label">Total Volume</span>
             <span className="mt-stat-value">{formatCurrency(stats.totalAmount, globalCurrency)}</span>
@@ -414,28 +498,45 @@ export default function MoneyTransfersPage() {
             </span>
           </div>
         </div>
+
         <div className="mt-stat-card">
-          <div className="mt-stat-icon">📥</div>
+          <div className="stat-icon-badge" title="Sender fees earned">
+            <IconArrowDownLeft size={14} />
+          </div>
           <div className="mt-stat-content">
             <span className="mt-stat-label">Sender Fees Earned</span>
-            <span className="mt-stat-value" style={{ color: '#15803d' }}>{formatCurrency(stats.totalSenderFee, globalCurrency)}</span>
-            <span className="mt-stat-sub">0.1% fee collected (Cash In)</span>
+            <span className="mt-stat-value" style={{ color: '#15803d' }}>
+              {formatCurrency(stats.totalSenderFee, globalCurrency)}
+            </span>
+            <span className="mt-stat-sub">0.1% collected (Cash In)</span>
           </div>
         </div>
+
         <div className="mt-stat-card">
-          <div className="mt-stat-icon">📤</div>
+          <div className="stat-icon-badge" title="Receiver fees paid">
+            <IconArrowUpRight size={14} />
+          </div>
           <div className="mt-stat-content">
             <span className="mt-stat-label">Receiver Fees Paid</span>
-            <span className="mt-stat-value" style={{ color: '#dc2626' }}>{formatCurrency(stats.totalReceiverFee, globalCurrency)}</span>
-            <span className="mt-stat-sub">0.05% fee incurred (Cash Out)</span>
+            <span className="mt-stat-value" style={{ color: '#b91c1c' }}>
+              {formatCurrency(stats.totalReceiverFee, globalCurrency)}
+            </span>
+            <span className="mt-stat-sub">0.05% charge (Cash Out)</span>
           </div>
         </div>
+
         <div className="mt-stat-card highlight">
-          <div className="mt-stat-icon">📊</div>
+          <div className="stat-icon-badge" title="Net profit margin">
+            <IconBarChart size={14} />
+          </div>
           <div className="mt-stat-content">
-            <span className="mt-stat-label">Net Profit / Margin</span>
-            <span className="mt-stat-value" style={{ color: stats.totalProfit >= 0 ? '#15803d' : '#dc2626' }}>
-              {stats.totalProfit >= 0 ? '+' : '−'}{formatCurrency(Math.abs(stats.totalProfit), globalCurrency)}
+            <span className="mt-stat-label">Net Profit</span>
+            <span
+              className="mt-stat-value"
+              style={{ color: stats.totalProfit >= 0 ? '#15803d' : '#b91c1c' }}
+            >
+              {stats.totalProfit >= 0 ? '+' : '−'}
+              {formatCurrency(Math.abs(stats.totalProfit), globalCurrency)}
             </span>
             <span className="mt-stat-sub">
               {stats.completed} completed · {stats.pending} pending
@@ -448,18 +549,18 @@ export default function MoneyTransfersPage() {
       <div className="filter-panel">
         <div className="filter-search-row">
           <div className="filter-search-wrap">
-            <svg className="filter-search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-            </svg>
+            <IconSearch size={15} className="filter-search-icon" />
             <input
               type="text"
               className="filter-search-input"
-              placeholder="Search sender, receiver, notes, reference ID…"
+              placeholder="Search sender, receiver, notes, or reference ID…"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
             />
             {search && (
-              <button className="filter-clear-x" onClick={() => setSearch('')}>✕</button>
+              <button type="button" className="filter-clear-x" onClick={() => setSearch('')} aria-label="Clear search">
+                <IconX size={13} />
+              </button>
             )}
           </div>
         </div>
@@ -469,10 +570,18 @@ export default function MoneyTransfersPage() {
           <div className="filter-group">
             <span className="filter-group-label">Direction</span>
             <div className="type-pill-group">
-              <button className={`type-pill ${typeFilter === 'all' ? 'type-pill-active' : ''}`} onClick={() => setTypeFilter('all')}>All</button>
-              <button className={`type-pill ${typeFilter === 'receive' ? 'type-pill-active' : ''}`} onClick={() => setTypeFilter('receive')}>📥 Receive</button>
-              <button className={`type-pill ${typeFilter === 'send' ? 'type-pill-active' : ''}`} onClick={() => setTypeFilter('send')}>📤 Send</button>
-              <button className={`type-pill ${typeFilter === 'both' ? 'type-pill-active' : ''}`} onClick={() => setTypeFilter('both')}>🔄 Direct</button>
+              <button type="button" className={`type-pill ${typeFilter === 'all' ? 'type-pill-active' : ''}`} onClick={() => setTypeFilter('all')}>
+                All
+              </button>
+              <button type="button" className={`type-pill ${typeFilter === 'receive' ? 'type-pill-active' : ''}`} onClick={() => setTypeFilter('receive')}>
+                Receive
+              </button>
+              <button type="button" className={`type-pill ${typeFilter === 'send' ? 'type-pill-active' : ''}`} onClick={() => setTypeFilter('send')}>
+                Send
+              </button>
+              <button type="button" className={`type-pill ${typeFilter === 'both' ? 'type-pill-active' : ''}`} onClick={() => setTypeFilter('both')}>
+                Direct
+              </button>
             </div>
           </div>
 
@@ -482,10 +591,18 @@ export default function MoneyTransfersPage() {
           <div className="filter-group">
             <span className="filter-group-label">Status</span>
             <div className="type-pill-group">
-              <button className={`type-pill ${statusFilter === 'all' ? 'type-pill-active' : ''}`} onClick={() => setStatusFilter('all')}>All</button>
-              <button className={`type-pill ${statusFilter === 'completed' ? 'type-pill-active' : ''}`} onClick={() => setStatusFilter('completed')}>✅ Completed</button>
-              <button className={`type-pill ${statusFilter === 'pending' ? 'type-pill-active' : ''}`} onClick={() => setStatusFilter('pending')}>⏳ Pending</button>
-              <button className={`type-pill ${statusFilter === 'cancelled' ? 'type-pill-active' : ''}`} onClick={() => setStatusFilter('cancelled')}>❌ Cancelled</button>
+              <button type="button" className={`type-pill ${statusFilter === 'all' ? 'type-pill-active' : ''}`} onClick={() => setStatusFilter('all')}>
+                All
+              </button>
+              <button type="button" className={`type-pill ${statusFilter === 'completed' ? 'type-pill-active' : ''}`} onClick={() => setStatusFilter('completed')}>
+                Completed
+              </button>
+              <button type="button" className={`type-pill ${statusFilter === 'pending' ? 'type-pill-active' : ''}`} onClick={() => setStatusFilter('pending')}>
+                Pending
+              </button>
+              <button type="button" className={`type-pill ${statusFilter === 'cancelled' ? 'type-pill-active' : ''}`} onClick={() => setStatusFilter('cancelled')}>
+                Cancelled
+              </button>
             </div>
           </div>
 
@@ -493,21 +610,29 @@ export default function MoneyTransfersPage() {
 
           <div className="filter-group">
             <span className="filter-group-label">From</span>
-            <input type="date" className="filter-date-compact" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+            <input type="date" className="filter-date-compact" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
           </div>
           <div className="filter-group">
             <span className="filter-group-label">To</span>
-            <input type="date" className="filter-date-compact" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+            <input type="date" className="filter-date-compact" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
           </div>
 
           {hasFilters && (
             <>
               <div className="filter-sep" />
-              <button className="filter-reset-btn" onClick={() => { setSearch(''); setTypeFilter('all'); setStatusFilter('all'); setDateFrom(''); setDateTo(''); }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
-                Reset
+              <button
+                type="button"
+                className="filter-reset-btn"
+                onClick={() => {
+                  setSearch('');
+                  setTypeFilter('all');
+                  setStatusFilter('all');
+                  setDateFrom('');
+                  setDateTo('');
+                }}
+              >
+                <IconX size={12} />
+                <span>Reset</span>
               </button>
             </>
           )}
@@ -516,7 +641,9 @@ export default function MoneyTransfersPage() {
         {hasFilters && (
           <div className="filter-result-strip">
             <span className="filter-result-dot" />
-            {filtered.length} result{filtered.length !== 1 ? 's' : ''} of {moneyTransfers.length} transfers
+            <span>
+              {filtered.length} result{filtered.length !== 1 ? 's' : ''} of {moneyTransfers.length} transfers
+            </span>
           </div>
         )}
       </div>
@@ -524,149 +651,247 @@ export default function MoneyTransfersPage() {
       {/* ── Table ── */}
       {filtered.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-state-icon">💸</div>
+          <div className="empty-state-icon">
+            <IconTransfer size={34} />
+          </div>
           <div className="empty-state-title">No gold transfers found</div>
           <div className="empty-state-text">
-            {hasFilters ? 'Try adjusting your filters.' : 'Record your first gold transfer to get started.'}
+            {hasFilters ? 'Try adjusting your filters to see more transfers.' : 'Record your first gold transfer to get started.'}
           </div>
           {!hasFilters && (
-            <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-              <button className="btn btn-secondary" onClick={() => openNewForm('receive')}>📥 Receive Money</button>
-              <button className="btn btn-secondary" onClick={() => openNewForm('send')}>📤 Send Money</button>
-              <button className="btn btn-primary" onClick={() => openNewForm('both')}>🔄 Direct Transfer</button>
+            <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => openNewForm('receive')}>
+                <IconArrowDownLeft size={14} />
+                <span>Receive Money</span>
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => openNewForm('send')}>
+                <IconArrowUpRight size={14} />
+                <span>Send Money</span>
+              </button>
+              <button type="button" className="btn btn-primary" onClick={() => openNewForm('both')}>
+                <IconTransfer size={14} />
+                <span>Direct Transfer</span>
+              </button>
             </div>
           )}
         </div>
       ) : (
-        <div className="table-wrapper">
-          <table className="tx-table">
-            <thead>
-              <tr>
-                <th onClick={() => handleSort('transferType')}>Direction <SortIcon k="transferType" /></th>
-                <th onClick={() => handleSort('dateTime')}>Date <SortIcon k="dateTime" /></th>
-                <th onClick={() => handleSort('senderName')}>Sender <SortIcon k="senderName" /></th>
-                <th onClick={() => handleSort('receiverName')}>Receiver <SortIcon k="receiverName" /></th>
-                <th onClick={() => handleSort('amount')}>Amount <SortIcon k="amount" /></th>
-                <th>Sender Fee (0.1%)</th>
-                <th>Receiver Fee (0.05%)</th>
-                <th onClick={() => handleSort('netProfit')}>Net Profit <SortIcon k="netProfit" /></th>
-                <th>Delivered / Net</th>
-                <th>Payment</th>
-                <th onClick={() => handleSort('status')}>Status <SortIcon k="status" /></th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(mt => {
-                const itemType: TransferType =
-                  mt.transferType ||
-                  (mt.senderName && !mt.receiverName ? 'receive' :
-                   !mt.senderName && mt.receiverName ? 'send' : 'both');
+        <>
+          {/* Bulk Action Bar */}
+          {selectedIds.size > 0 && (
+            <div className="bulk-action-bar">
+              <div className="bulk-action-info">
+                <span className="bulk-action-count">{selectedIds.size}</span>
+                <span>
+                  {selectedIds.size} transfer{selectedIds.size !== 1 ? 's' : ''} selected
+                  {filtered.length > selectedIds.size && (
+                    <span style={{ color: '#78716c', fontWeight: 500, fontSize: 12 }}>
+                      {' '}
+                      (of {filtered.length} filtered)
+                    </span>
+                  )}
+                </span>
+              </div>
+              <div className="bulk-action-btns">
+                {filtered.length > selectedIds.size && (
+                  <button
+                    type="button"
+                    className="btn-bulk-clear"
+                    onClick={() => setSelectedIds(new Set(filtered.map((t) => t.id)))}
+                  >
+                    Select All ({filtered.length})
+                  </button>
+                )}
+                <button type="button" className="btn-bulk-clear" onClick={clearSelection}>
+                  Clear Selection
+                </button>
+                <button type="button" className="btn-bulk-delete" onClick={() => setShowBulkDeleteModal(true)}>
+                  <IconTrash size={13} />
+                  <span>Delete Selected ({selectedIds.size})</span>
+                </button>
+              </div>
+            </div>
+          )}
 
-                return (
-                  <tr key={mt.id} className="mt-row" onClick={() => setViewItem(mt)} style={{ cursor: 'pointer' }}>
-                    <td>
-                      <span className={`mt-type-badge ${itemType}`}>
-                        {itemType === 'receive' ? '📥 Receive' : itemType === 'send' ? '📤 Send' : '🔄 Transfer'}
-                      </span>
-                    </td>
-                    <td style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
-                      {formatDate(mt.dateTime)}
-                    </td>
-                    <td>
-                      {mt.senderName ? (
-                        <div className="mt-party-cell">
-                          <span className="mt-party-icon sender">📤</span>
-                          <span className="mt-party-name">{mt.senderName}</span>
-                        </div>
-                      ) : (
-                        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>
-                      )}
-                    </td>
-                    <td>
-                      {mt.receiverName ? (
-                        <div className="mt-party-cell">
-                          <span className="mt-party-icon receiver">📥</span>
-                          <span className="mt-party-name">{mt.receiverName}</span>
-                        </div>
-                      ) : (
-                        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>
-                      )}
-                    </td>
-                    <td className="font-bold">
-                      <div>{formatCurrency(mt.amount, mt.currency)}</div>
-                      {mt.currency !== globalCurrency && (
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500, marginTop: 2 }}>
-                          ≈ {formatCurrency(convertCurrency(mt.amount, mt.currency, globalCurrency), globalCurrency)}
-                        </div>
-                      )}
-                    </td>
-                    <td style={{ color: mt.senderFee > 0 ? '#15803d' : 'var(--text-muted)', fontWeight: 600 }}>
-                      {mt.senderFee > 0 ? `+${formatCurrency(mt.senderFee, mt.currency)}` : '—'}
-                    </td>
-                    <td style={{ color: mt.receiverFee > 0 ? '#dc2626' : 'var(--text-muted)', fontWeight: 600 }}>
-                      {mt.receiverFee > 0 ? `−${formatCurrency(mt.receiverFee, mt.currency)}` : '—'}
-                    </td>
-                    <td>
-                      <span className={`pnl-badge ${mt.netProfit > 0 ? 'profit' : mt.netProfit < 0 ? 'loss' : 'neutral'}`}>
-                        <span className="pnl-amount">
-                          {mt.netProfit >= 0 ? '+' : '−'}{formatCurrency(Math.abs(mt.netProfit), mt.currency)}
+          <div className="table-wrapper">
+            <table className="tx-table">
+              <thead>
+                <tr>
+                  <th className="table-checkbox-cell" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      className="table-checkbox"
+                      checked={allVisibleSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = isIndeterminate;
+                      }}
+                      onChange={toggleSelectAll}
+                      aria-label="Select all gold transfers"
+                    />
+                  </th>
+                  <th onClick={() => handleSort('transferType')}>Direction <SortIcon k="transferType" /></th>
+                  <th onClick={() => handleSort('dateTime')}>Date <SortIcon k="dateTime" /></th>
+                  <th onClick={() => handleSort('senderName')}>Sender <SortIcon k="senderName" /></th>
+                  <th onClick={() => handleSort('receiverName')}>Receiver <SortIcon k="receiverName" /></th>
+                  <th className="num-col" onClick={() => handleSort('amount')}>Amount <SortIcon k="amount" /></th>
+                  <th className="num-col">Sender Fee</th>
+                  <th className="num-col">Receiver Fee</th>
+                  <th onClick={() => handleSort('netProfit')}>Net Profit <SortIcon k="netProfit" /></th>
+                  <th className="num-col">Delivered / Net</th>
+                  <th>Payment</th>
+                  <th onClick={() => handleSort('status')}>Status <SortIcon k="status" /></th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((mt) => {
+                  const itemType: TransferType =
+                    mt.transferType ||
+                    (mt.senderName && !mt.receiverName ? 'receive' : !mt.senderName && mt.receiverName ? 'send' : 'both');
+
+                  return (
+                    <tr
+                      key={mt.id}
+                      className={`mt-row ${selectedIds.has(mt.id) ? 'row-selected' : ''}`}
+                      onClick={() => setViewItem(mt)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td className="table-checkbox-cell" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          className="table-checkbox"
+                          checked={selectedIds.has(mt.id)}
+                          onChange={() => toggleSelect(mt.id)}
+                          aria-label={`Select transfer ${mt.id}`}
+                        />
+                      </td>
+                      <td>
+                        <span className={`mt-type-badge ${itemType}`}>
+                          {itemType === 'receive' ? (
+                            <IconArrowDownLeft size={11} />
+                          ) : itemType === 'send' ? (
+                            <IconArrowUpRight size={11} />
+                          ) : (
+                            <IconTransfer size={11} />
+                          )}
+                          <span>{itemType === 'receive' ? 'Receive' : itemType === 'send' ? 'Send' : 'Transfer'}</span>
                         </span>
-                      </span>
-                    </td>
-                    <td style={{ fontWeight: 600 }}>
-                      {formatCurrency(mt.amountDelivered, mt.currency)}
-                    </td>
-                    <td>
-                      <span className={`payment-badge ${mt.paymentType.toLowerCase()}`}>
-                        {mt.paymentType === 'RTGS' ? '🏦 RTGS' : '💵 Cash'}
-                      </span>
-                      {mt.paymentType === 'RTGS' && mt.transactionId && (
-                        <div style={{ fontSize: 10.5, color: 'var(--text-secondary)', fontFamily: 'monospace', marginTop: 3 }}>
-                          #{mt.transactionId}
+                      </td>
+                      <td style={{ color: 'var(--text-secondary)', fontSize: 12.5 }}>{formatDate(mt.dateTime)}</td>
+                      <td>
+                        {mt.senderName ? (
+                          <span className="mt-party-name">{mt.senderName}</span>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        )}
+                      </td>
+                      <td>
+                        {mt.receiverName ? (
+                          <span className="mt-party-name">{mt.receiverName}</span>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        )}
+                      </td>
+                      <td className="num-col font-bold">
+                        <div>{formatCurrency(mt.amount, mt.currency)}</div>
+                        {mt.currency !== globalCurrency && (
+                          <div className="cell-sub">
+                            ≈ {formatCurrency(convertCurrency(mt.amount, mt.currency, globalCurrency), globalCurrency)}
+                          </div>
+                        )}
+                      </td>
+                      <td className="num-col" style={{ color: mt.senderFee > 0 ? '#15803d' : 'var(--text-muted)', fontWeight: 600 }}>
+                        {mt.senderFee > 0 ? `+${formatCurrency(mt.senderFee, mt.currency)}` : '—'}
+                      </td>
+                      <td className="num-col" style={{ color: mt.receiverFee > 0 ? '#b91c1c' : 'var(--text-muted)', fontWeight: 600 }}>
+                        {mt.receiverFee > 0 ? `−${formatCurrency(mt.receiverFee, mt.currency)}` : '—'}
+                      </td>
+                      <td>
+                        <span className={`pnl-badge ${mt.netProfit > 0 ? 'profit' : mt.netProfit < 0 ? 'loss' : 'neutral'}`}>
+                          <span className="pnl-amount">
+                            {mt.netProfit >= 0 ? '+' : '−'}
+                            {formatCurrency(Math.abs(mt.netProfit), mt.currency)}
+                          </span>
+                        </span>
+                      </td>
+                      <td className="num-col" style={{ fontWeight: 600 }}>{formatCurrency(mt.amountDelivered, mt.currency)}</td>
+                      <td>
+                        <span className={`payment-badge ${mt.paymentType.toLowerCase()}`}>
+                          {mt.paymentType === 'RTGS' ? <IconLandmark size={11} /> : <IconBanknote size={11} />}
+                          <span>{mt.paymentType}</span>
+                        </span>
+                        {mt.paymentType === 'RTGS' && mt.transactionId && (
+                          <div className="cell-ref-id">#{mt.transactionId}</div>
+                        )}
+                      </td>
+                      <td>
+                        <span className={`mt-status-badge ${mt.status}`}>
+                          {mt.status === 'completed' ? (
+                            <IconCheck size={11} />
+                          ) : mt.status === 'pending' ? (
+                            <IconClock size={11} />
+                          ) : (
+                            <IconX size={11} />
+                          )}
+                          <span>{mt.status}</span>
+                        </span>
+                      </td>
+                      <td>
+                        <div className="actions-cell" style={{ justifyContent: 'flex-end' }} onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-icon-only"
+                            onClick={() => openEditForm(mt)}
+                            title="Edit transfer"
+                            aria-label="Edit transfer"
+                          >
+                            <IconEdit size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-danger btn-icon-only"
+                            onClick={() => setDeleteId(mt.id)}
+                            title="Delete transfer"
+                            aria-label="Delete transfer"
+                          >
+                            <IconTrash size={14} />
+                          </button>
                         </div>
-                      )}
-                    </td>
-                    <td>
-                      <span className={`mt-status-badge ${mt.status}`}>
-                        {mt.status === 'completed' ? '✅' : mt.status === 'pending' ? '⏳' : '❌'} {mt.status}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="actions-cell" onClick={e => e.stopPropagation()}>
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => openEditForm(mt)}
-                          title="Edit"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          className="btn btn-danger btn-sm"
-                          onClick={() => setDeleteId(mt.id)}
-                          title="Delete"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {/* ── New / Edit Transfer Modal ── */}
       {showForm && (
-        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) { setShowForm(false); resetForm(); } }}>
-          <div className="modal" style={{ maxWidth: 640 }}>
+        <div
+          className="modal-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowForm(false);
+              resetForm();
+            }
+          }}
+        >
+          <div className="modal" style={{ maxWidth: 620 }}>
             <div className="modal-header">
-              <span className="modal-title">
-                {editItem ? '✏️ Edit Gold Transfer' : '💸 New Gold Transfer'}
-              </span>
-              <button className="btn btn-ghost btn-sm" onClick={() => { setShowForm(false); resetForm(); }}>✕</button>
+              <span className="modal-title">{editItem ? 'Edit Gold Transfer' : 'New Gold Transfer'}</span>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  setShowForm(false);
+                  resetForm();
+                }}
+                aria-label="Close modal"
+              >
+                <IconX size={16} />
+              </button>
             </div>
             <div className="modal-body">
               {/* Transfer Direction Toggle */}
@@ -674,84 +899,87 @@ export default function MoneyTransfersPage() {
                 <button
                   type="button"
                   className={`mt-mode-btn ${formData.transferType === 'receive' ? 'active receive' : ''}`}
-                  onClick={() => setFormData(p => ({
-                    ...p,
-                    transferType: 'receive',
-                    senderFeePercent: p.senderFeePercent === '0' ? '0.1' : p.senderFeePercent,
-                  }))}
+                  onClick={() =>
+                    setFormData((p) => ({
+                      ...p,
+                      transferType: 'receive',
+                      senderFeePercent: p.senderFeePercent === '0' ? '0.1' : p.senderFeePercent,
+                    }))
+                  }
                 >
-                  <span>📥</span>
-                  <span>Receive Money (Sender)</span>
+                  <IconArrowDownLeft size={14} />
+                  <span>Receive Money</span>
                 </button>
                 <button
                   type="button"
                   className={`mt-mode-btn ${formData.transferType === 'send' ? 'active send' : ''}`}
-                  onClick={() => setFormData(p => ({
-                    ...p,
-                    transferType: 'send',
-                    receiverFeePercent: p.receiverFeePercent === '0' ? '0.05' : p.receiverFeePercent,
-                  }))}
+                  onClick={() =>
+                    setFormData((p) => ({
+                      ...p,
+                      transferType: 'send',
+                      receiverFeePercent: p.receiverFeePercent === '0' ? '0.05' : p.receiverFeePercent,
+                    }))
+                  }
                 >
-                  <span>📤</span>
-                  <span>Send Money (Receiver)</span>
+                  <IconArrowUpRight size={14} />
+                  <span>Send Money</span>
                 </button>
                 <button
                   type="button"
                   className={`mt-mode-btn ${formData.transferType === 'both' ? 'active both' : ''}`}
-                  onClick={() => setFormData(p => ({
-                    ...p,
-                    transferType: 'both',
-                    senderFeePercent: p.senderFeePercent === '0' ? '0.1' : p.senderFeePercent,
-                    receiverFeePercent: p.receiverFeePercent === '0' ? '0.05' : p.receiverFeePercent,
-                  }))}
+                  onClick={() =>
+                    setFormData((p) => ({
+                      ...p,
+                      transferType: 'both',
+                      senderFeePercent: p.senderFeePercent === '0' ? '0.1' : p.senderFeePercent,
+                      receiverFeePercent: p.receiverFeePercent === '0' ? '0.05' : p.receiverFeePercent,
+                    }))
+                  }
                 >
-                  <span>🔄</span>
-                  <span>Direct Transfer (Both)</span>
+                  <IconTransfer size={14} />
+                  <span>Direct Transfer</span>
                 </button>
               </div>
 
               <form onSubmit={handleSubmit}>
                 <div className="mt-form-grid">
-                  {/* Sender Name — visible in 'receive' or 'both' */}
                   {(formData.transferType === 'receive' || formData.transferType === 'both') && (
                     <div className="form-group" style={{ gridColumn: formData.transferType === 'receive' ? '1 / -1' : undefined }}>
                       <label className="form-label">
-                        <span>📤</span> Sender Name <span className="required">*</span>
+                        Sender Name <span className="required">*</span>
                       </label>
                       <input
                         type="text"
                         className="form-input"
                         placeholder="Who is giving the money?"
                         value={formData.senderName}
-                        onChange={e => setFormData(p => ({ ...p, senderName: e.target.value }))}
+                        onChange={(e) => setFormData((p) => ({ ...p, senderName: e.target.value }))}
                         required
                         autoFocus
                       />
                     </div>
                   )}
 
-                  {/* Receiver Name — visible in 'send' or 'both' */}
                   {(formData.transferType === 'send' || formData.transferType === 'both') && (
                     <div className="form-group" style={{ gridColumn: formData.transferType === 'send' ? '1 / -1' : undefined }}>
                       <label className="form-label">
-                        <span>📥</span> Receiver Name <span className="required">*</span>
+                        Receiver Name <span className="required">*</span>
                       </label>
                       <input
                         type="text"
                         className="form-input"
-                        placeholder="Who is taking / receiving the money?"
+                        placeholder="Who is receiving the money?"
                         value={formData.receiverName}
-                        onChange={e => setFormData(p => ({ ...p, receiverName: e.target.value }))}
+                        onChange={(e) => setFormData((p) => ({ ...p, receiverName: e.target.value }))}
                         required
                         autoFocus={formData.transferType === 'send'}
                       />
                     </div>
                   )}
 
-                  {/* Amount */}
                   <div className="form-group">
                     <label className="form-label">
-                      <span>💰</span> Transfer Amount <span className="required">*</span>
+                      Transfer Amount <span className="required">*</span>
                     </label>
                     <input
                       type="number"
@@ -760,32 +988,30 @@ export default function MoneyTransfersPage() {
                       step="0.01"
                       min="0"
                       value={formData.amount}
-                      onChange={e => setFormData(p => ({ ...p, amount: e.target.value }))}
+                      onChange={(e) => setFormData((p) => ({ ...p, amount: e.target.value }))}
                       required
                     />
                   </div>
 
-                  {/* Currency */}
                   <div className="form-group">
-                    <label className="form-label">
-                      <span>🌍</span> Currency
-                    </label>
+                    <label className="form-label">Currency</label>
                     <select
-                      className="form-input"
+                      className="form-select"
                       value={formData.currency}
-                      onChange={e => setFormData(p => ({ ...p, currency: e.target.value }))}
+                      onChange={(e) => setFormData((p) => ({ ...p, currency: e.target.value }))}
                     >
-                      {CURRENCIES.map(c => (
-                        <option key={c.code} value={c.code}>{c.code} — {c.symbol} ({c.name})</option>
+                      {CURRENCIES.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.code} — {c.symbol} ({c.name})
+                        </option>
                       ))}
                     </select>
                   </div>
 
-                  {/* Sender Fee % — visible in 'receive' or 'both' */}
                   {(formData.transferType === 'receive' || formData.transferType === 'both') && (
                     <div className="form-group" style={{ gridColumn: formData.transferType === 'receive' ? '1 / -1' : undefined }}>
                       <label className="form-label">
-                        <span>📤</span> Sender Fee (%) <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>(We Charge)</span>
+                        Sender Fee (%) <span className="form-hint" style={{ fontWeight: 400 }}>— We charge</span>
                       </label>
                       <input
                         type="number"
@@ -793,19 +1019,18 @@ export default function MoneyTransfersPage() {
                         step="0.01"
                         min="0"
                         value={formData.senderFeePercent}
-                        onChange={e => setFormData(p => ({ ...p, senderFeePercent: e.target.value }))}
+                        onChange={(e) => setFormData((p) => ({ ...p, senderFeePercent: e.target.value }))}
                       />
                       <div className="form-helper" style={{ color: '#15803d' }}>
-                        Fee Collected: +{formatCurrency(formSenderFee, formData.currency)} (Your Earning)
+                        Fee Collected: +{formatCurrency(formSenderFee, formData.currency)}
                       </div>
                     </div>
                   )}
 
-                  {/* Receiver Fee % — visible in 'send' or 'both' */}
                   {(formData.transferType === 'send' || formData.transferType === 'both') && (
                     <div className="form-group" style={{ gridColumn: formData.transferType === 'send' ? '1 / -1' : undefined }}>
                       <label className="form-label">
-                        <span>📥</span> Receiver Fee (%) <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>(Receiver Takes)</span>
+                        Receiver Fee (%) <span className="form-hint" style={{ fontWeight: 400 }}>— Receiver takes</span>
                       </label>
                       <input
                         type="number"
@@ -813,85 +1038,72 @@ export default function MoneyTransfersPage() {
                         step="0.01"
                         min="0"
                         value={formData.receiverFeePercent}
-                        onChange={e => setFormData(p => ({ ...p, receiverFeePercent: e.target.value }))}
+                        onChange={(e) => setFormData((p) => ({ ...p, receiverFeePercent: e.target.value }))}
                       />
-                      <div className="form-helper" style={{ color: '#dc2626' }}>
-                        Receiver Charge: −{formatCurrency(formReceiverFee, formData.currency)} (Cost)
+                      <div className="form-helper" style={{ color: '#b91c1c' }}>
+                        Receiver Charge: −{formatCurrency(formReceiverFee, formData.currency)}
                       </div>
                     </div>
                   )}
 
-                  {/* Payment Type */}
                   <div className="form-group">
-                    <label className="form-label">
-                      <span>💳</span> Payment Type
-                    </label>
+                    <label className="form-label">Payment Method</label>
                     <select
-                      className="form-input"
+                      className="form-select"
                       value={formData.paymentType}
-                      onChange={e => setFormData(p => ({ ...p, paymentType: e.target.value as PaymentType }))}
+                      onChange={(e) => setFormData((p) => ({ ...p, paymentType: e.target.value as PaymentType }))}
                     >
-                      <option value="Cash">💵 Cash</option>
-                      <option value="RTGS">🏦 RTGS</option>
+                      <option value="Cash">Cash</option>
+                      <option value="RTGS">RTGS</option>
                     </select>
                   </div>
 
-                  {/* RTGS Transaction ID */}
                   {formData.paymentType === 'RTGS' && (
                     <div className="form-group">
                       <label className="form-label">
-                        <span>🔖</span> Transaction ID <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>(optional)</span>
+                        Transaction ID <span className="form-hint" style={{ fontWeight: 400 }}>(optional)</span>
                       </label>
                       <input
                         type="text"
                         className="form-input"
                         placeholder="RTGS reference number"
                         value={formData.transactionId}
-                        onChange={e => setFormData(p => ({ ...p, transactionId: e.target.value }))}
+                        onChange={(e) => setFormData((p) => ({ ...p, transactionId: e.target.value }))}
                       />
                     </div>
                   )}
 
-                  {/* Date & Time */}
                   <div className="form-group">
-                    <label className="form-label">
-                      <span>📅</span> Date & Time
-                    </label>
+                    <label className="form-label">Date &amp; Time</label>
                     <input
                       type="datetime-local"
                       className="form-input"
                       value={formData.dateTime}
-                      onChange={e => setFormData(p => ({ ...p, dateTime: e.target.value }))}
+                      onChange={(e) => setFormData((p) => ({ ...p, dateTime: e.target.value }))}
                     />
                   </div>
 
-                  {/* Status */}
                   <div className="form-group">
-                    <label className="form-label">
-                      <span>📋</span> Status
-                    </label>
+                    <label className="form-label">Status</label>
                     <select
-                      className="form-input"
+                      className="form-select"
                       value={formData.status}
-                      onChange={e => setFormData(p => ({ ...p, status: e.target.value as 'completed' | 'pending' | 'cancelled' }))}
+                      onChange={(e) => setFormData((p) => ({ ...p, status: e.target.value as 'completed' | 'pending' | 'cancelled' }))}
                     >
-                      <option value="completed">✅ Completed</option>
-                      <option value="pending">⏳ Pending</option>
-                      <option value="cancelled">❌ Cancelled</option>
+                      <option value="completed">Completed</option>
+                      <option value="pending">Pending</option>
+                      <option value="cancelled">Cancelled</option>
                     </select>
                   </div>
 
-                  {/* Notes */}
                   <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                    <label className="form-label">
-                      <span>📝</span> Notes
-                    </label>
+                    <label className="form-label">Notes</label>
                     <textarea
-                      className="form-input"
+                      className="form-textarea"
                       rows={2}
                       placeholder="Optional notes about this transfer…"
                       value={formData.notes}
-                      onChange={e => setFormData(p => ({ ...p, notes: e.target.value }))}
+                      onChange={(e) => setFormData((p) => ({ ...p, notes: e.target.value }))}
                     />
                   </div>
                 </div>
@@ -901,10 +1113,10 @@ export default function MoneyTransfersPage() {
                   <div className="mt-calc-preview">
                     <div className="mt-calc-title">
                       {formData.transferType === 'receive'
-                        ? '📥 Receipt Breakdown (From Sender)'
+                        ? 'Receipt Summary (From Sender)'
                         : formData.transferType === 'send'
-                        ? '📤 Disbursement Breakdown (To Receiver)'
-                        : '🔄 Transfer Breakdown (Sender to Receiver)'}
+                        ? 'Disbursement Summary (To Receiver)'
+                        : 'Transfer Summary (Sender to Receiver)'}
                     </div>
                     <div className="mt-calc-grid">
                       <div className="mt-calc-row">
@@ -914,14 +1126,14 @@ export default function MoneyTransfersPage() {
 
                       {formData.transferType !== 'send' && (
                         <div className="mt-calc-row" style={{ color: '#15803d' }}>
-                          <span>Sender Fee ({formData.senderFeePercent}% - We Charge)</span>
+                          <span>Sender Fee ({formData.senderFeePercent}%)</span>
                           <span>+{formatCurrency(formSenderFee, formData.currency)}</span>
                         </div>
                       )}
 
                       {formData.transferType !== 'receive' && (
-                        <div className="mt-calc-row" style={{ color: '#dc2626' }}>
-                          <span>Receiver Fee ({formData.receiverFeePercent}% - Receiver Takes)</span>
+                        <div className="mt-calc-row" style={{ color: '#b91c1c' }}>
+                          <span>Receiver Fee ({formData.receiverFeePercent}%)</span>
                           <span>−{formatCurrency(formReceiverFee, formData.currency)}</span>
                         </div>
                       )}
@@ -931,39 +1143,40 @@ export default function MoneyTransfersPage() {
                       {formData.transferType === 'receive' ? (
                         <>
                           <div className="mt-calc-row highlight">
-                            <span>💰 Your Earning (Fee Collected)</span>
-                            <span style={{ color: '#15803d', fontWeight: 800 }}>
+                            <span>Your Earning (Fee Collected)</span>
+                            <span style={{ color: '#15803d', fontWeight: 700 }}>
                               +{formatCurrency(formSenderFee, formData.currency)}
                             </span>
                           </div>
                           <div className="mt-calc-row">
-                            <span>📥 Net Deposit Credited</span>
+                            <span>Net Deposit Credited</span>
                             <span className="font-bold">{formatCurrency(formDelivered, formData.currency)}</span>
                           </div>
                         </>
                       ) : formData.transferType === 'send' ? (
                         <>
                           <div className="mt-calc-row highlight">
-                            <span>💸 Fee Incurred (Receiver Charge)</span>
-                            <span style={{ color: '#dc2626', fontWeight: 800 }}>
+                            <span>Fee Incurred (Receiver Charge)</span>
+                            <span style={{ color: '#b91c1c', fontWeight: 700 }}>
                               −{formatCurrency(formReceiverFee, formData.currency)}
                             </span>
                           </div>
                           <div className="mt-calc-row">
-                            <span>📤 Net Paid to Receiver</span>
+                            <span>Net Paid to Receiver</span>
                             <span className="font-bold">{formatCurrency(formDelivered, formData.currency)}</span>
                           </div>
                         </>
                       ) : (
                         <>
                           <div className="mt-calc-row highlight">
-                            <span>💰 Net Profit (Spread Margin)</span>
-                            <span style={{ color: formNetProfit >= 0 ? '#15803d' : '#dc2626', fontWeight: 800 }}>
-                              {formNetProfit >= 0 ? '+' : '−'}{formatCurrency(Math.abs(formNetProfit), formData.currency)}
+                            <span>Net Profit (Spread Margin)</span>
+                            <span style={{ color: formNetProfit >= 0 ? '#15803d' : '#b91c1c', fontWeight: 700 }}>
+                              {formNetProfit >= 0 ? '+' : '−'}
+                              {formatCurrency(Math.abs(formNetProfit), formData.currency)}
                             </span>
                           </div>
                           <div className="mt-calc-row">
-                            <span>📥 Amount Delivered to Receiver</span>
+                            <span>Amount Delivered to Receiver</span>
                             <span className="font-bold">{formatCurrency(formDelivered, formData.currency)}</span>
                           </div>
                         </>
@@ -972,16 +1185,25 @@ export default function MoneyTransfersPage() {
                   </div>
                 )}
 
-                <div className="modal-footer" style={{ paddingBottom: 0, paddingLeft: 0, paddingRight: 0 }}>
-                  <button type="button" className="btn btn-secondary" onClick={() => { setShowForm(false); resetForm(); }}>Cancel</button>
+                <div className="modal-footer" style={{ margin: '20px -26px -22px', padding: '16px 26px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      setShowForm(false);
+                      resetForm();
+                    }}
+                  >
+                    Cancel
+                  </button>
                   <button type="submit" className="btn btn-primary">
                     {editItem
-                      ? '💾 Update Transfer'
+                      ? 'Save Changes'
                       : formData.transferType === 'receive'
-                      ? '📥 Record Receipt'
+                      ? 'Record Receipt'
                       : formData.transferType === 'send'
-                      ? '📤 Record Disbursement'
-                      : '💸 Record Transfer'}
+                      ? 'Record Disbursement'
+                      : 'Record Transfer'}
                   </button>
                 </div>
               </form>
@@ -992,92 +1214,111 @@ export default function MoneyTransfersPage() {
 
       {/* ── View Detail Modal ── */}
       {viewItem && (
-        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setViewItem(null); }}>
-          <div className="modal" style={{ maxWidth: 520 }}>
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setViewItem(null); }}>
+          <div className="modal" style={{ maxWidth: 500 }}>
             <div className="modal-header">
-              <span className="modal-title">💸 Transfer Details</span>
-              <button className="btn btn-ghost btn-sm" onClick={() => setViewItem(null)}>✕</button>
+              <span className="modal-title">Transfer Details</span>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setViewItem(null)} aria-label="Close modal">
+                <IconX size={16} />
+              </button>
             </div>
             <div className="modal-body">
               <div className="mt-detail-grid">
                 <div className="mt-detail-row">
-                  <span className="mt-detail-label">🧭 Direction</span>
+                  <span className="mt-detail-label">Direction</span>
                   <span className="mt-detail-value">
                     <span className={`mt-type-badge ${viewItem.transferType || 'both'}`}>
-                      {(viewItem.transferType || 'both') === 'receive' ? '📥 Receive (Sender Gives)' :
-                       (viewItem.transferType || 'both') === 'send' ? '📤 Send (Give to Receiver)' : '🔄 Direct Transfer (Both)'}
+                      {(viewItem.transferType || 'both') === 'receive'
+                        ? 'Receive (Sender Gives)'
+                        : (viewItem.transferType || 'both') === 'send'
+                        ? 'Send (To Receiver)'
+                        : 'Direct Transfer'}
                     </span>
                   </span>
                 </div>
                 {viewItem.senderName && (
                   <div className="mt-detail-row">
-                    <span className="mt-detail-label">📤 Sender</span>
+                    <span className="mt-detail-label">Sender</span>
                     <span className="mt-detail-value">{viewItem.senderName}</span>
                   </div>
                 )}
                 {viewItem.receiverName && (
                   <div className="mt-detail-row">
-                    <span className="mt-detail-label">📥 Receiver</span>
+                    <span className="mt-detail-label">Receiver</span>
                     <span className="mt-detail-value">{viewItem.receiverName}</span>
                   </div>
                 )}
                 <div className="mt-detail-row">
-                  <span className="mt-detail-label">💰 Amount</span>
+                  <span className="mt-detail-label">Principal Amount</span>
                   <span className="mt-detail-value font-bold">{formatCurrency(viewItem.amount, viewItem.currency)}</span>
                 </div>
                 {viewItem.senderFee > 0 && (
                   <div className="mt-detail-row">
-                    <span className="mt-detail-label">📤 Sender Fee ({viewItem.senderFeePercent}%)</span>
-                    <span className="mt-detail-value" style={{ color: '#15803d' }}>+{formatCurrency(viewItem.senderFee, viewItem.currency)}</span>
+                    <span className="mt-detail-label">Sender Fee ({viewItem.senderFeePercent}%)</span>
+                    <span className="mt-detail-value" style={{ color: '#15803d' }}>
+                      +{formatCurrency(viewItem.senderFee, viewItem.currency)}
+                    </span>
                   </div>
                 )}
                 {viewItem.receiverFee > 0 && (
                   <div className="mt-detail-row">
-                    <span className="mt-detail-label">📥 Receiver Fee ({viewItem.receiverFeePercent}%)</span>
-                    <span className="mt-detail-value" style={{ color: '#dc2626' }}>−{formatCurrency(viewItem.receiverFee, viewItem.currency)}</span>
+                    <span className="mt-detail-label">Receiver Fee ({viewItem.receiverFeePercent}%)</span>
+                    <span className="mt-detail-value" style={{ color: '#b91c1c' }}>
+                      −{formatCurrency(viewItem.receiverFee, viewItem.currency)}
+                    </span>
                   </div>
                 )}
                 <div className="mt-detail-row highlight">
-                  <span className="mt-detail-label">📊 Net Profit / Margin</span>
-                  <span className="mt-detail-value" style={{ color: viewItem.netProfit >= 0 ? '#15803d' : '#dc2626', fontWeight: 800 }}>
-                    {viewItem.netProfit >= 0 ? '+' : '−'}{formatCurrency(Math.abs(viewItem.netProfit), viewItem.currency)}
+                  <span className="mt-detail-label">Net Profit / Margin</span>
+                  <span
+                    className="mt-detail-value"
+                    style={{ color: viewItem.netProfit >= 0 ? '#15803d' : '#b91c1c', fontWeight: 700 }}
+                  >
+                    {viewItem.netProfit >= 0 ? '+' : '−'}
+                    {formatCurrency(Math.abs(viewItem.netProfit), viewItem.currency)}
                   </span>
                 </div>
                 <div className="mt-detail-row">
-                  <span className="mt-detail-label">📥 Delivered / Net</span>
+                  <span className="mt-detail-label">Delivered / Net</span>
                   <span className="mt-detail-value font-bold">{formatCurrency(viewItem.amountDelivered, viewItem.currency)}</span>
                 </div>
                 <div className="mt-detail-row">
-                  <span className="mt-detail-label">💳 Payment</span>
+                  <span className="mt-detail-label">Payment</span>
                   <span className="mt-detail-value">
-                    {viewItem.paymentType === 'RTGS' ? '🏦 RTGS' : '💵 Cash'}
-                    {viewItem.transactionId && <span style={{ fontFamily: 'monospace', marginLeft: 8, fontSize: 12 }}>#{viewItem.transactionId}</span>}
+                    {viewItem.paymentType}
+                    {viewItem.transactionId && <span className="cell-ref-id" style={{ display: 'inline', marginLeft: 8 }}>#{viewItem.transactionId}</span>}
                   </span>
                 </div>
                 <div className="mt-detail-row">
-                  <span className="mt-detail-label">📅 Date</span>
+                  <span className="mt-detail-label">Date</span>
                   <span className="mt-detail-value">{formatDate(viewItem.dateTime)}</span>
                 </div>
                 <div className="mt-detail-row">
-                  <span className="mt-detail-label">📋 Status</span>
+                  <span className="mt-detail-label">Status</span>
                   <span className="mt-detail-value">
-                    <span className={`mt-status-badge ${viewItem.status}`}>
-                      {viewItem.status === 'completed' ? '✅' : viewItem.status === 'pending' ? '⏳' : '❌'} {viewItem.status}
-                    </span>
+                    <span className={`mt-status-badge ${viewItem.status}`}>{viewItem.status}</span>
                   </span>
                 </div>
                 {viewItem.notes && (
                   <div className="mt-detail-row">
-                    <span className="mt-detail-label">📝 Notes</span>
+                    <span className="mt-detail-label">Notes</span>
                     <span className="mt-detail-value">{viewItem.notes}</span>
                   </div>
                 )}
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setViewItem(null)}>Close</button>
-              <button className="btn btn-primary" onClick={() => { openEditForm(viewItem); setViewItem(null); }}>
-                ✏️ Edit
+              <button type="button" className="btn btn-secondary" onClick={() => setViewItem(null)}>Close</button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  openEditForm(viewItem);
+                  setViewItem(null);
+                }}
+              >
+                <IconEdit size={14} />
+                <span>Edit</span>
               </button>
             </div>
           </div>
@@ -1086,11 +1327,13 @@ export default function MoneyTransfersPage() {
 
       {/* ── Delete Confirm Modal ── */}
       {deleteId && (
-        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setDeleteId(null); }}>
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setDeleteId(null); }}>
           <div className="modal" style={{ maxWidth: 400 }}>
             <div className="modal-header">
-              <span className="modal-title">🗑️ Confirm Delete</span>
-              <button className="btn btn-ghost btn-sm" onClick={() => setDeleteId(null)}>✕</button>
+              <span className="modal-title">Confirm Delete</span>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setDeleteId(null)} aria-label="Close modal">
+                <IconX size={16} />
+              </button>
             </div>
             <div className="modal-body">
               <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
@@ -1098,9 +1341,60 @@ export default function MoneyTransfersPage() {
               </p>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setDeleteId(null)}>Cancel</button>
-              <button className="btn btn-danger" onClick={() => confirmDelete(deleteId)}>
-                🗑️ Delete
+              <button type="button" className="btn btn-secondary" onClick={() => setDeleteId(null)}>Cancel</button>
+              <button type="button" className="btn btn-danger" onClick={() => confirmDelete(deleteId)}>
+                <IconTrash size={14} />
+                <span>Delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bulk Delete Confirm Modal ── */}
+      {showBulkDeleteModal && (
+        <div
+          className="modal-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isDeletingBulk) setShowBulkDeleteModal(false);
+          }}
+        >
+          <div className="modal" style={{ maxWidth: 440 }}>
+            <div className="modal-header">
+              <span className="modal-title">
+                Delete {selectedIds.size} Transfer{selectedIds.size !== 1 ? 's' : ''}
+              </span>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                disabled={isDeletingBulk}
+                onClick={() => setShowBulkDeleteModal(false)}
+                aria-label="Close modal"
+              >
+                <IconX size={16} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ color: 'var(--text-secondary)', fontSize: 14, lineHeight: 1.5 }}>
+                Are you sure you want to permanently delete the{' '}
+                <strong>
+                  {selectedIds.size} selected transfer{selectedIds.size !== 1 ? 's' : ''}
+                </strong>
+                ? This action cannot be undone.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={isDeletingBulk}
+                onClick={() => setShowBulkDeleteModal(false)}
+              >
+                Cancel
+              </button>
+              <button type="button" className="btn btn-danger" disabled={isDeletingBulk} onClick={handleBulkDelete}>
+                <IconTrash size={14} />
+                <span>{isDeletingBulk ? 'Deleting…' : `Yes, Delete (${selectedIds.size})`}</span>
               </button>
             </div>
           </div>

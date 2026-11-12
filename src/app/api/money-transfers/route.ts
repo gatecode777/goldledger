@@ -45,3 +45,23 @@ export async function POST(req: Request) {
   }
 }
 
+// DELETE /api/money-transfers — bulk delete
+export async function DELETE(req: Request) {
+  const session = await auth();
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  try {
+    const body = await req.json();
+    const ids: string[] = Array.isArray(body.ids) ? body.ids : body.id ? [body.id] : [];
+    if (!ids.length) {
+      return NextResponse.json({ error: 'No IDs provided' }, { status: 400 });
+    }
+    await connectDB();
+    await MoneyTransferModel.deleteMany({ _id: { $in: ids } });
+    return NextResponse.json({ success: true, count: ids.length });
+  } catch (err) {
+    console.error('[DELETE /api/money-transfers]', err);
+    return NextResponse.json({ error: 'Failed to delete gold transfers' }, { status: 500 });
+  }
+}
+

@@ -6,6 +6,14 @@ import { useToast } from '@/components/Toast';
 import { formatDate } from '@/lib/formatters';
 import { CURRENCIES, getCurrencySymbol } from '@/lib/currencies';
 import type { CountryGoldRate, LiveRatesResponse } from '@/app/api/live-rates/route';
+import {
+  IconGlobe,
+  IconRefresh,
+  IconZap,
+  IconCheck,
+  IconTrash,
+  IconX,
+} from '@/components/Icons';
 
 export default function SettingsPage() {
   const {
@@ -155,8 +163,8 @@ export default function SettingsPage() {
       <div className="live-rates-section">
         <div className="live-rates-header">
           <div className="live-rates-title-group">
-            <span className="live-rates-title">
-              🌍 Live International Gold Rates
+            <span className="live-rates-title" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <IconGlobe size={17} /> Live International Gold Rates
             </span>
             <span className="live-status-pill">
               <span className="live-pulse-dot" />
@@ -214,11 +222,12 @@ export default function SettingsPage() {
               title="Fetch fresh real-time spot gold rates from free API"
             >
               <span style={{
-                display: 'inline-block',
+                display: 'inline-flex',
+                alignItems: 'center',
                 transform: liveRefreshing ? 'rotate(360deg)' : 'none',
                 transition: liveRefreshing ? 'transform 1s linear infinite' : 'none',
               }}>
-                🔄
+                <IconRefresh size={14} />
               </span>
               {liveRefreshing ? 'Refreshing…' : 'Refresh Rates'}
             </button>
@@ -373,7 +382,7 @@ export default function SettingsPage() {
                         onClick={() => applyLiveUSDRate(c.pricePerTroyOz)}
                         title="Copy this live spot rate to the Reference Gold Rate setting"
                       >
-                        ⚡ Use as Reference Rate
+                        <IconZap size={13} /> Use as Reference Rate
                       </button>
                     )}
                   </div>
@@ -385,12 +394,12 @@ export default function SettingsPage() {
       </div>
 
       {/* ── 2. Reference Rate & Configuration Layout ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 24 }}>
+      <div className="settings-layout-grid">
         {/* Main settings column */}
         <div>
           {/* Reference Rate Setting */}
           <div className="settings-section">
-            <div className="settings-section-title">📊 Active Reference Gold Rate</div>
+            <div className="settings-section-title">Active Reference Gold Rate</div>
 
             <div style={{ padding: '24px 22px' }}>
               <div style={{ marginBottom: 20 }}>
@@ -417,7 +426,7 @@ export default function SettingsPage() {
                     />
                   </div>
                   <button className="btn btn-primary" onClick={saveRate} disabled={saving}>
-                    {saving ? '⏳ Saving…' : '💾 Save Rate'}
+                    {saving ? 'Saving…' : <><IconCheck size={14} /> Save Rate</>}
                   </button>
                 </div>
                 {rateSettings?.lastUpdated && (
@@ -431,7 +440,9 @@ export default function SettingsPage() {
 
           {/* Global Display Currency Setting */}
           <div className="settings-section" style={{ marginBottom: 20 }}>
-            <div className="settings-section-title">🌐 Global Display Currency</div>
+            <div className="settings-section-title" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              <IconGlobe size={15} /> Global Display Currency
+            </div>
             <div style={{ padding: '20px 22px' }}>
               <label className="form-label">
                 Default Currency for Dashboard, Transaction Log, and Pre-filled Forms
@@ -464,7 +475,7 @@ export default function SettingsPage() {
 
           {/* Equivalent Rates (live preview) */}
           <div className="settings-section">
-            <div className="settings-section-title">💱 Saved Reference Rate Equivalents (live preview)</div>
+            <div className="settings-section-title">Saved Reference Rate Equivalents (live preview)</div>
             {conversionExamples.map(({ code, unit }) => (
               <div key={`${code}-${unit}`} className="settings-row">
                 <div>
@@ -473,7 +484,7 @@ export default function SettingsPage() {
                     {CURRENCIES.find((c) => c.code === code)?.name}
                   </div>
                 </div>
-                <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 18, fontWeight: 700, color: 'var(--text-gold)' }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontVariantNumeric: 'tabular-nums', fontSize: 18, fontWeight: 700, color: 'var(--text-gold)' }}>
                   {rateInCurrency(code, unit)}
                 </div>
               </div>
@@ -483,7 +494,7 @@ export default function SettingsPage() {
           {/* Danger zone */}
           <div className="settings-section" style={{ borderColor: 'rgba(248,113,113,0.2)' }}>
             <div className="settings-section-title" style={{ color: 'var(--text-danger)' }}>
-              ⚠️ Danger Zone
+              Danger Zone
             </div>
             <div className="settings-row">
               <div>
@@ -497,7 +508,7 @@ export default function SettingsPage() {
                 className="btn btn-danger"
                 onClick={() => setShowClear(true)}
               >
-                🗑️ Delete All
+                <IconTrash size={14} /> Delete All
               </button>
             </div>
           </div>
@@ -511,7 +522,7 @@ export default function SettingsPage() {
               <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>
                 Active Reference Rate
               </div>
-              <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 40, fontWeight: 800, color: '#b45309' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontVariantNumeric: 'tabular-nums', fontSize: 40, fontWeight: 800, color: '#b45309' }}>
                 ${rate.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
               <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
@@ -550,7 +561,7 @@ export default function SettingsPage() {
           {/* Database Stats Card */}
           <div className="card">
             <div className="card-header">
-              <span className="card-title">📋 Database Stats</span>
+              <span className="card-title">Database Stats</span>
             </div>
             <div className="card-body" style={{ padding: '14px 20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
@@ -576,7 +587,7 @@ export default function SettingsPage() {
           <div className="card" style={{ background: '#fffbeb', borderColor: '#fde68a' }}>
             <div className="card-body" style={{ padding: '14px 18px' }}>
               <div style={{ fontSize: 13, color: '#92400e', fontWeight: 600, marginBottom: 6 }}>
-                💡 How Live Rates Work
+                How Live Rates Work
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
                 Live gold rates are streamed from free financial feeds (Gold-API real-time spot & Open-ER FX). You can monitor international markets across <strong>India, South Africa, UAE, USA, Hong Kong, Europe, and China</strong>, and click <strong>&ldquo;Use as Reference Rate&rdquo;</strong> anytime to lock today&apos;s spot price into your ledger.
@@ -591,8 +602,8 @@ export default function SettingsPage() {
         <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowClear(false); }}>
           <div className="modal" style={{ maxWidth: 420 }}>
             <div className="modal-header">
-              <span className="modal-title">🗑️ Delete All Transactions</span>
-              <button className="btn btn-ghost btn-sm" onClick={() => setShowClear(false)}>✕</button>
+              <span className="modal-title">Delete All Transactions</span>
+              <button className="btn btn-ghost btn-sm" onClick={() => setShowClear(false)}><IconX size={16} /></button>
             </div>
             <div className="modal-body">
               <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
@@ -616,7 +627,7 @@ export default function SettingsPage() {
                   window.location.reload();
                 }}
               >
-                🗑️ Yes, Delete All
+                <IconTrash size={14} /> Yes, Delete All
               </button>
             </div>
           </div>

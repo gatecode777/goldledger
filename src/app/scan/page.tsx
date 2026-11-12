@@ -9,6 +9,7 @@ import { useTransactions } from '@/context/TransactionContext';
 import { useToast } from '@/components/Toast';
 import { CURRENCIES, convertCurrency } from '@/lib/currencies';
 import { formatCurrency } from '@/lib/formatters';
+import { IconLedger, IconRefresh, IconScan, IconCheck, IconPlus, IconX, IconFile, IconAlert, IconZap } from '@/components/Icons';
 
 type ScanState = 'idle' | 'uploading' | 'processing' | 'done' | 'error';
 
@@ -259,10 +260,10 @@ export default function ScanPage() {
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => setViewMode('batch')} className="btn btn-secondary">
-                📋 Table View
+                <IconLedger size={14} /> Table View
               </button>
               <button onClick={resetScan} className="btn btn-ghost">
-                🔄 Scan Another
+                <IconRefresh size={14} /> Scan Another
               </button>
               <Link href="/transactions" className="btn btn-ghost">
                 ← Ledger
@@ -272,7 +273,7 @@ export default function ScanPage() {
 
           <div className="scan-result-preview" style={{ marginBottom: 20 }}>
             <div className="scan-result-header">
-              <span style={{ fontSize: 22 }}>🤖</span>
+              <IconScan size={22} style={{ color: '#b45309' }} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600, fontSize: 14, color: '#92400e' }}>
                   AI Extraction Complete — {fileName}
@@ -289,7 +290,7 @@ export default function ScanPage() {
                     width: 70,
                     height: 55,
                     objectFit: 'cover',
-                    borderRadius: 8,
+                    borderRadius: 0,
                     border: '1px solid #fde68a',
                   }}
                 />
@@ -334,9 +335,10 @@ export default function ScanPage() {
                   fontSize: 13,
                   fontWeight: 600,
                   padding: '3px 10px',
-                  borderRadius: 20,
-                  background: '#dcfce7',
-                  color: '#15803d',
+                  borderRadius: 0,
+                  background: '#fef3c7',
+                  color: '#92400e',
+                  border: '1px solid #fde68a',
                 }}
               >
                 {items.length} {items.length === 1 ? 'Transaction' : 'Transactions'} Extracted
@@ -354,7 +356,7 @@ export default function ScanPage() {
                 className="btn btn-secondary"
                 onClick={() => setViewMode('voucher')}
               >
-                🧾 Voucher Mode
+                <IconFile size={14} /> Voucher Mode
               </button>
             )}
             <button
@@ -362,15 +364,11 @@ export default function ScanPage() {
               className="btn btn-primary"
               onClick={handleSaveAll}
               disabled={saving || items.length === 0}
-              style={{
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
-              }}
             >
-              {saving ? '⏳ Saving to Ledger…' : `💾 Save All (${items.length}) to Ledger`}
+              {saving ? 'Saving to Ledger…' : <><IconCheck size={14} /> Save All ({items.length}) to Ledger</>}
             </button>
             <button onClick={resetScan} className="btn btn-secondary">
-              🔄 Scan Another
+              <IconRefresh size={14} /> Scan Another
             </button>
             <Link href="/transactions" className="btn btn-ghost">
               ← Ledger
@@ -381,7 +379,7 @@ export default function ScanPage() {
         {/* Thumbnail Preview Banner */}
         <div className="scan-result-preview" style={{ marginBottom: 20 }}>
           <div className="scan-result-header">
-            <span style={{ fontSize: 24 }}>✨</span>
+            <IconScan size={22} style={{ color: '#b45309' }} />
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 600, fontSize: 14, color: '#92400e' }}>
                 Handwritten / Slip Detection Successful — {fileName}
@@ -399,7 +397,7 @@ export default function ScanPage() {
                     width: 80,
                     height: 60,
                     objectFit: 'cover',
-                    borderRadius: 8,
+                    borderRadius: 0,
                     border: '1.5px solid #fde68a',
                     cursor: 'pointer',
                   }}
@@ -421,7 +419,7 @@ export default function ScanPage() {
               onClick={addItem}
               style={{ fontSize: 12 }}
             >
-              ➕ Add Entry
+              <IconPlus size={13} /> Add Entry
             </button>
           </div>
 
@@ -586,7 +584,7 @@ export default function ScanPage() {
                         title="Delete entry"
                         style={{ color: '#ef4444', padding: '4px 6px' }}
                       >
-                        ✕
+                        <IconX size={14} />
                       </button>
                     </td>
                   </tr>
@@ -626,12 +624,8 @@ export default function ScanPage() {
                 className="btn btn-primary"
                 onClick={handleSaveAll}
                 disabled={saving || items.length === 0}
-                style={{
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
-                }}
               >
-                {saving ? '⏳ Saving to Ledger…' : `💾 Save All (${items.length}) to Ledger`}
+                {saving ? 'Saving to Ledger…' : <><IconCheck size={14} /> Save All ({items.length}) to Ledger</>}
               </button>
             </div>
           </div>
@@ -660,7 +654,7 @@ export default function ScanPage() {
       <div className="scan-card">
         {/* Header */}
         <div className="scan-card-header">
-          <span className="scan-card-icon">🤖</span>
+          <span className="scan-card-icon"><IconScan size={22} /></span>
           <div>
             <div className="scan-card-title">AI Receipt &amp; Note Scanner</div>
             <div className="scan-card-sub">
@@ -698,7 +692,7 @@ export default function ScanPage() {
                 </div>
               ) : (
                 <div className="scan-dropzone-inner">
-                  <div className="scan-dropzone-icon">📄</div>
+                  <div className="scan-dropzone-icon"><IconFile size={34} style={{ color: '#b45309' }} /></div>
                   <div className="scan-dropzone-title">Drop receipt or handwritten note image here</div>
                   <div className="scan-dropzone-sub">or click to browse / capture from camera</div>
                   <div className="scan-dropzone-formats">JPG · PNG · WEBP · HEIC · up to 10 MB</div>
@@ -708,7 +702,7 @@ export default function ScanPage() {
 
             {scanState === 'error' && (
               <div className="scan-error-banner">
-                <span>⚠️</span>
+                <IconAlert size={16} />
                 <span>{errorMsg}</span>
               </div>
             )}
@@ -721,7 +715,7 @@ export default function ScanPage() {
                     if (inputRef.current?.files?.[0]) processFile(inputRef.current.files[0]);
                   }}
                 >
-                  🤖 Scan with AI
+                  <IconScan size={15} /> Scan with AI
                 </button>
                 <button className="btn btn-ghost" onClick={resetScan}>
                   Clear
@@ -735,7 +729,7 @@ export default function ScanPage() {
         {(scanState === 'uploading' || scanState === 'processing') && (
           <div className="scan-analyzing">
             <div className="scan-pulse-ring">
-              <div className="scan-pulse-dot">🤖</div>
+              <div className="scan-pulse-dot"><IconScan size={22} style={{ color: '#b45309' }} /></div>
             </div>
             <div className="scan-analyzing-title">
               {scanState === 'uploading' ? 'Uploading image…' : 'AI is reading your document…'}
@@ -753,22 +747,22 @@ export default function ScanPage() {
         {/* Tips */}
         {scanState === 'idle' && (
           <div className="scan-tips">
-            <div className="scan-tips-title">📸 Tips for best results</div>
+            <div className="scan-tips-title">Tips for best results</div>
             <div className="scan-tips-grid">
               <div className="scan-tip-item">
-                <span className="scan-tip-icon">📝</span>
+                <span className="scan-tip-icon"><IconFile size={15} /></span>
                 <span>Supports multiple handwritten entries (e.g. SELL 10g, BUY 5g)</span>
               </div>
               <div className="scan-tip-item">
-                <span className="scan-tip-icon">💡</span>
+                <span className="scan-tip-icon"><IconZap size={15} /></span>
                 <span>Ensure good lighting and high contrast</span>
               </div>
               <div className="scan-tip-item">
-                <span className="scan-tip-icon">📐</span>
+                <span className="scan-tip-icon"><IconCheck size={15} /></span>
                 <span>Keep note flat and clearly visible</span>
               </div>
               <div className="scan-tip-item">
-                <span className="scan-tip-icon">📱</span>
+                <span className="scan-tip-icon"><IconScan size={15} /></span>
                 <span>On mobile, capture directly using camera</span>
               </div>
             </div>
