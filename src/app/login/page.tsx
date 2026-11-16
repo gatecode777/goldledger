@@ -36,6 +36,8 @@ export default async function LoginPage({
         throw err;
       }
 
+      console.error('[loginAction auth error]:', err);
+
       // Failed login → redirect to login with error flag
       redirect(`/login?error=invalid&callbackUrl=${encodeURIComponent(callbackUrl)}`);
     }

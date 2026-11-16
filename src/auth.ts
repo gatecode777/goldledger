@@ -25,14 +25,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
-        if (credentials.email !== adminEmail) return null;
+        const inputEmail = String(credentials.email).trim().toLowerCase();
+        const targetEmail = adminEmail.trim().toLowerCase();
+
+        if (inputEmail !== targetEmail) {
+          console.error(`[auth] Email mismatch. Received: "${inputEmail}", Expected: "${targetEmail}"`);
+          return null;
+        }
+
+        // Clean any quotes, whitespace, or escaped backslashes in ADMIN_PASSWORD_HASH
+        // (Vercel environment variables sometimes keep literal backslashes from \$, or surrounding quotes)
+        const cleanHash = adminHash.trim().replace(/^["']|["']$/g, '').replace(/\\(\$)/g, '$1');
 
         const passwordMatch = await bcrypt.compare(
           credentials.password as string,
-          adminHash
+          cleanHash
         );
 
-        if (!passwordMatch) return null;
+        if (!passwordMatch) {
+          console.error('[auth] Password mismatch: bcrypt.compare returned false');
+          return null;
+        }
 
         return {
           id:    'admin',
