@@ -31,14 +31,6 @@ function LoginFormInner({ action, error: errorProp }: Props) {
 
   return (
     <div className={`login-page ${mounted ? 'mounted' : ''}`}>
-      {/* Animated background */}
-      <div className="login-bg">
-        <div className="login-orb login-orb-1" />
-        <div className="login-orb login-orb-2" />
-        <div className="login-orb login-orb-3" />
-        <div className="login-grid" />
-      </div>
-
       {/* Card */}
       <div className="login-card">
         {/* Logo */}
